@@ -1,23 +1,15 @@
-FROM golang:1.21-alpine AS builder
+FROM python:3.9-slim
 
 WORKDIR /app
 
-COPY main.go .
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN go build -o web-video-downloader .
-
-FROM alpine:latest
-
-WORKDIR /app
-
-RUN apk add --no-cache python3 py3-pip ffmpeg && \
-    pip install --no-cache-dir yt-dlp
-
-COPY --from=builder /app/web-video-downloader .
+COPY app.py .
 COPY index.html .
 
 RUN mkdir -p downloads
 
-EXPOSE 8080
+EXPOSE 5000
 
-CMD ["./web-video-downloader"]
+CMD ["python", "app.py"]
