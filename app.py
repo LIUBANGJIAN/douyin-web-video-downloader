@@ -6,7 +6,7 @@ import re
 
 app = Flask(__name__)
 
-APP_VERSION = "v1.3.1"
+APP_VERSION = "v1.3.2"
 
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
@@ -65,7 +65,7 @@ def download_video():
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], f'{video_id}.%(ext)s')
         
         ydl_opts = {
-            'format': 'best[ext=mp4]/best',
+            'format': 'best',
             'outtmpl': output_path,
             'quiet': False,
             'no_warnings': True,
@@ -73,6 +73,10 @@ def download_video():
             'ignoreerrors': False,
             'retries': 3,
             'merge_output_format': 'mp4',
+            'postprocessors': [{
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': 'mp4',
+            }],
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
