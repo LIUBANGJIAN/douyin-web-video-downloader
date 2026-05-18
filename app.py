@@ -6,7 +6,7 @@ import uuid
 app = Flask(__name__)
 
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
-app.config['PORT'] = int(os.environ.get('PORT', 8080))
+app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])

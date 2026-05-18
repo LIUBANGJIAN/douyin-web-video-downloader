@@ -5,10 +5,10 @@ services:
     image: liubangjian/web-video-downloader:latest
     container_name: web-video-downloader
     ports:
-      - "8080:8080"
+      - "8787:8787"
     volumes:
       - ./downloads:/app/downloads
     environment:
-      - PORT=8080
+      - PORT=8787
       - DOWNLOAD_DIR=/app/downloads
     restart: unless-stopped
