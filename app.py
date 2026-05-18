@@ -4,7 +4,9 @@ import os
 import uuid
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'downloads'
+
+app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
+app.config['PORT'] = int(os.environ.get('PORT', 8080))
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
@@ -75,4 +77,4 @@ def serve_download(filename):
     return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename), as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=app.config['PORT'], debug=True)

@@ -10,6 +10,6 @@ COPY index.html .
 
 RUN mkdir -p downloads
 
-EXPOSE 5000
+EXPOSE 8080
 
 CMD ["python", "app.py"]

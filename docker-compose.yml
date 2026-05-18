@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web-video-downloader:
+    image: liubangjian/web-video-downloader:latest
+    container_name: web-video-downloader
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./downloads:/app/downloads
+    environment:
+      - PORT=8080
+      - DOWNLOAD_DIR=/app/downloads
+    restart: unless-stopped
