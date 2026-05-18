@@ -1,14 +1,20 @@
 version: '3.8'
 
 services:
-  web-video-downloader:
-    image: liubangjian/web-video-downloader:latest
-    container_name: web-video-downloader
+  douyin-web-video-downloader:
+    build: .
+    image: liubangjian/douyin-web-video-downloader:latest
+    container_name: douyin-web-video-downloader
     ports:
       - "8787:8787"
     volumes:
+      - ./data/douyin:/data/douyin
       - ./downloads:/app/downloads
     environment:
       - PORT=8787
       - DOWNLOAD_DIR=/app/downloads
+      - DOUYIN_API_URL=http://127.0.0.1:80
+      - DOUYIN_CONFIG_PATH=/data/douyin/config.yaml
+      - COOKIE_CHECK_INTERVAL=300
     restart: unless-stopped
+    shm_size: '1gb'

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+downloads/*
+!downloads/.gitkeep
+data/douyin/config.yaml
+.env
+*.log

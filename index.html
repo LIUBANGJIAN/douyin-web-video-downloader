@@ -3,594 +3,439 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>视频下载器 - 支持抖音、YouTube等1000+网站</title>
+    <title>抖音视频下载器</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #fe2c55 0%, #25f4ee 100%);
             min-height: 100vh;
             padding: 20px;
         }
-
-        .container {
-            max-width: 480px;
-            margin: 0 auto;
-            padding-top: 40px;
-        }
-
-        .logo {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .logo .icon {
-            font-size: 64px;
-            margin-bottom: 15px;
-        }
-
-        .logo h1 {
-            color: white;
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-
-        .version-badge {
+        .container { max-width: 480px; margin: 0 auto; padding-top: 30px; }
+        .logo { text-align: center; margin-bottom: 24px; color: #fff; }
+        .logo .icon { font-size: 56px; }
+        .logo h1 { font-size: 26px; margin: 8px 0; }
+        .badge {
             display: inline-block;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
+            background: rgba(255,255,255,.25);
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
+            margin: 4px;
         }
-
-        .node-status {
-            display: inline-block;
-            margin-left: 8px;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-        }
-
-        .node-status.available {
-            background: rgba(76, 175, 80, 0.8);
-            color: white;
-        }
-
-        .node-status.unavailable {
-            background: rgba(244, 67, 54, 0.8);
-            color: white;
-        }
-
+        .badge.ok { background: rgba(76,175,80,.85); }
+        .badge.warn { background: rgba(244,67,54,.85); }
+        .badge.scan { background: rgba(255,152,0,.85); }
         .card {
-            background: white;
+            background: #fff;
             border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,.25);
         }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 20px;
-        }
-
-        .input-group label {
-            display: block;
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-
-        .input-group input {
+        label { display: block; color: #666; font-size: 14px; margin-bottom: 8px; font-weight: 500; }
+        input[type=text] {
             width: 100%;
-            padding: 14px 16px;
+            padding: 14px;
             border: 2px solid #e0e0e0;
             border-radius: 12px;
             font-size: 15px;
-            transition: all 0.3s ease;
-            background: #f9f9f9;
+            margin-bottom: 12px;
         }
-
-        .input-group input:focus {
-            outline: none;
-            border-color: #667eea;
-            background: white;
-        }
-
-        .input-group-row {
-            display: flex;
-            gap: 10px;
-        }
-
-        .input-group-row button {
-            padding: 14px 20px;
+        input:focus { outline: none; border-color: #fe2c55; }
+        .row { display: flex; gap: 8px; margin-bottom: 16px; }
+        .row button {
+            flex: 1;
+            padding: 12px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
+            background: #f0f0f0;
             cursor: pointer;
             font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
         }
-
-        .btn-paste {
-            background: #f0f0f0;
-            color: #666;
-        }
-
-        .btn-paste:hover {
-            background: #e0e0e0;
-        }
-
-        .btn-clear {
-            background: #f0f0f0;
-            color: #666;
-        }
-
-        .btn-clear:hover {
-            background: #e0e0e0;
-        }
-
-        .btn-download {
+        .btn-primary {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             border: none;
             border-radius: 12px;
+            background: linear-gradient(135deg, #fe2c55, #ff6b8a);
+            color: #fff;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
-
-        .btn-download:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-download:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .result {
-            margin-bottom: 20px;
-            padding: 15px;
+        .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+        .btn-secondary {
+            width: 100%;
+            padding: 14px;
+            border: none;
             border-radius: 12px;
+            background: linear-gradient(135deg, #25f4ee, #1cb5b0);
+            color: #111;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
             display: none;
         }
-
-        .result.success {
-            background: #e8f5e9;
-            border: 1px solid #c8e6c9;
+        .quality-group { display: none; margin-bottom: 16px; }
+        .quality-group.show { display: block; }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 15px;
         }
-
-        .result.error {
-            background: #ffebee;
-            border: 1px solid #ffcdd2;
-        }
-
-        .result.warning {
-            background: #fff8e1;
-            border: 1px solid #ffecb3;
-        }
-
-        .result.show {
-            display: block;
-        }
-
-        .result p {
+        .result {
+            display: none;
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 16px;
             font-size: 14px;
             line-height: 1.6;
         }
-
-        .result.success p {
-            color: #2e7d32;
+        .result.show { display: block; }
+        .result.ok { background: #e8f5e9; color: #2e7d32; }
+        .result.err { background: #ffebee; color: #c62828; }
+        .result.warn { background: #fff8e1; color: #f57c00; }
+        .video-info { display: flex; gap: 12px; margin-top: 8px; }
+        .video-info img {
+            width: 72px; height: 72px;
+            border-radius: 8px; object-fit: cover;
+            background: #eee;
         }
-
-        .result.error p {
-            color: #c62828;
-        }
-
-        .result.warning p {
-            color: #f57c00;
-        }
-
-        .video-info {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-
-        .video-thumbnail {
-            width: 80px;
-            height: 80px;
-            border-radius: 8px;
-            object-fit: cover;
-            background: #f0f0f0;
-        }
-
-        .video-thumbnail.placeholder {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-        }
-
-        .video-details {
-            flex: 1;
-        }
-
-        .video-title {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 5px;
-            font-size: 14px;
-            word-break: break-all;
-        }
-
-        .video-author {
-            font-size: 12px;
-            color: #999;
-        }
-
-        .video-size {
-            font-size: 11px;
-            color: #666;
-            margin-top: 4px;
-        }
-
-        .btn-download-video {
+        .video-title { font-weight: 600; word-break: break-all; }
+        .video-meta { font-size: 12px; color: #888; margin-top: 4px; }
+        .btn-dl {
             display: inline-block;
-            padding: 10px 20px;
-            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-            color: white;
+            margin-top: 10px;
+            padding: 10px 18px;
+            background: #4caf50;
+            color: #fff;
             text-decoration: none;
             border-radius: 8px;
             font-size: 14px;
-            font-weight: 500;
-            transition: all 0.3s ease;
         }
-
-        .btn-download-video:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
-        }
-
-        .tutorial {
-            background: #f1f8e9;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .tutorial h3 {
-            color: #388e3c;
-            font-size: 16px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-        }
-
-        .tutorial ol {
-            padding-left: 20px;
-        }
-
-        .tutorial li {
-            color: #555;
-            font-size: 14px;
-            margin-bottom: 8px;
-            line-height: 1.5;
-        }
-
-        .supported-sites {
-            background: #e3f2fd;
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .supported-sites h3 {
-            color: #1976d2;
-            font-size: 16px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-        }
-
-        .site-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .site-tag {
-            background: rgba(255, 255, 255, 0.8);
-            color: #1976d2;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-        }
-
-        .site-tag.more {
-            background: rgba(255, 255, 255, 0.5);
-        }
-
-        .tips {
-            background: #fff3e0;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-left: 4px solid #ff9800;
-        }
-
-        .tips p {
-            color: #e65100;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
         .footer {
             text-align: center;
-            margin-top: 30px;
-            color: rgba(255, 255, 255, 0.8);
+            margin-top: 24px;
+            color: rgba(255,255,255,.85);
             font-size: 12px;
         }
-
-        .footer a {
-            color: white;
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
-        }
-
         .loading {
             display: inline-block;
-            width: 20px;
-            height: 20px;
+            width: 18px; height: 18px;
             border: 2px solid #fff;
-            border-radius: 50%;
             border-top-color: transparent;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .thumbnail-container {
-            position: relative;
-        }
-
-        .thumbnail-loading {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: flex;
+        .qr-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.65);
+            z-index: 100;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+        }
+        .qr-overlay.show { display: flex; }
+        .qr-box {
+            background: #fff;
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 340px;
+            width: 100%;
+            text-align: center;
+        }
+        .qr-box h2 { font-size: 18px; margin-bottom: 8px; }
+        .qr-box p { color: #666; font-size: 13px; margin-bottom: 16px; }
+        .qr-box img {
+            width: 220px; height: 220px;
+            object-fit: contain;
+            border: 1px solid #eee;
             border-radius: 8px;
         }
-
-        .thumbnail-loading::after {
-            content: '';
-            width: 20px;
-            height: 20px;
-            border: 2px solid #667eea;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 0.6s linear infinite;
-        }
-
-        .thumbnail-error {
+        .qr-placeholder {
+            width: 220px; height: 220px;
+            margin: 0 auto;
             display: flex;
             align-items: center;
             justify-content: center;
             background: #f5f5f5;
+            border-radius: 8px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="logo">
-            <div class="icon">📥</div>
-            <h1>视频下载器</h1>
-            <div class="version-badge" id="version">v1.4.0</div>
-            <div class="node-status" id="nodeStatus">Node.js: 检测中...</div>
+            <div class="icon">🎵</div>
+            <h1>抖音视频下载</h1>
+            <span class="badge" id="version">v2.0.0</span>
+            <span class="badge" id="cookieBadge">Cookie 检测中</span>
         </div>
 
         <div class="card">
-            <div class="input-group">
-                <label for="url">视频链接</label>
-                <div class="input-group-row">
-                    <input type="text" id="url" placeholder="粘贴抖音、YouTube、B站等视频链接">
-                    <button class="btn-paste" onclick="pasteUrl()">粘贴</button>
-                    <button class="btn-clear" onclick="clearUrl()">清空</button>
-                </div>
+            <label for="url">抖音分享链接</label>
+            <input type="text" id="url" placeholder="粘贴 v.douyin.com 或分享口令">
+            <div class="row">
+                <button type="button" onclick="pasteUrl()">粘贴</button>
+                <button type="button" onclick="clearAll()">清空</button>
             </div>
 
-            <button class="btn-download" id="downloadBtn" onclick="downloadVideo()">
-                <span id="btnText">解析视频</span>
+            <div class="quality-group" id="qualityGroup">
+                <label for="quality">画质</label>
+                <select id="quality"></select>
+            </div>
+
+            <button class="btn-primary" id="parseBtn" onclick="parseVideo()">
+                <span id="parseText">解析视频</span>
+            </button>
+            <button class="btn-secondary" id="downloadBtn" onclick="downloadVideo()">
+                <span id="dlText">下载视频</span>
             </button>
 
-            <div class="result" id="result">
-                <div id="resultContent"></div>
-            </div>
-
-            <div class="tips">
-                <p>💡 提示：部分视频网站（如抖音）部分内容可能需要登录才能下载。</p>
-            </div>
-
-            <div class="tutorial">
-                <h3>📖 使用教程</h3>
-                <ol>
-                    <li>打开视频网站，找到想要下载的视频</li>
-                    <li>点击分享按钮，选择"复制链接"</li>
-                    <li>回到本页面，粘贴链接并点击解析</li>
-                    <li>点击下载按钮，保存视频到相册</li>
-                </ol>
-            </div>
-
-            <div class="supported-sites">
-                <h3>🌐 支持的网站</h3>
-                <div class="site-tags">
-                    <span class="site-tag">抖音</span>
-                    <span class="site-tag">YouTube</span>
-                    <span class="site-tag">B站</span>
-                    <span class="site-tag">快手</span>
-                    <span class="site-tag">微博</span>
-                    <span class="site-tag">小红书</span>
-                    <span class="site-tag">TikTok</span>
-                    <span class="site-tag more">更多...</span>
-                </div>
-            </div>
+            <div class="result" id="result"><div id="resultBody"></div></div>
         </div>
 
         <div class="footer">
-            <p>基于 yt-dlp | 支持 1000+ 视频网站 | 仅用于个人学习</p>
+            <p>基于 Evil0ctal/Douyin_TikTok_Download_API · 仅个人学习</p>
+        </div>
+    </div>
+
+    <div class="qr-overlay" id="qrOverlay">
+        <div class="qr-box">
+            <h2>抖音扫码登录</h2>
+            <p id="qrHint">请使用抖音 App 扫描下方二维码</p>
+            <div id="qrImageWrap">
+                <div class="qr-placeholder"><span class="loading" style="border-color:#fe2c55;border-top-color:transparent"></span></div>
+            </div>
+            <p style="margin-top:12px;font-size:12px;color:#999" id="qrStatus">正在生成二维码...</p>
         </div>
     </div>
 
     <script>
-        async function pasteUrl() {
-            const input = document.getElementById('url');
-            try {
-                const text = await navigator.clipboard.readText();
-                input.value = text;
-                input.focus();
-            } catch (err) {
-                input.focus();
+        let pollTimer = null;
+
+        function showQrOverlay(show) {
+            document.getElementById('qrOverlay').classList.toggle('show', show);
+        }
+
+        function setQrImage(b64) {
+            const wrap = document.getElementById('qrImageWrap');
+            if (b64) {
+                wrap.innerHTML = '<img src="data:image/png;base64,' + b64 + '" alt="登录二维码">';
+            } else {
+                wrap.innerHTML = '<div class="qr-placeholder"><span class="loading" style="border-color:#fe2c55;border-top-color:transparent"></span></div>';
             }
         }
 
-        function clearUrl() {
-            document.getElementById('url').value = '';
-            document.getElementById('result').classList.remove('show', 'success', 'error', 'warning');
-            document.getElementById('url').focus();
+        function updateCookieBadge(st) {
+            const el = document.getElementById('cookieBadge');
+            el.className = 'badge';
+            if (st.status === 'valid') {
+                el.textContent = '✅ 已登录';
+                el.classList.add('ok');
+                showQrOverlay(false);
+            } else if (st.status === 'scanning') {
+                el.textContent = '⏳ 扫码中';
+                el.classList.add('scan');
+                showQrOverlay(true);
+            } else {
+                el.textContent = '⚠️ 需扫码登录';
+                el.classList.add('warn');
+            }
         }
 
-        function formatFileSize(bytes) {
-            if (bytes === undefined || bytes === null) return '';
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        async function pollCookieStatus() {
+            try {
+                const r = await fetch('/api/cookie/status');
+                const st = await r.json();
+                updateCookieBadge(st);
+                document.getElementById('qrStatus').textContent = st.message || '';
+                if (st.qrCode) setQrImage(st.qrCode);
+                if (st.status === 'valid') {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                    showQrOverlay(false);
+                    return;
+                }
+                if (st.status === 'invalid' && !st.qrCode && pollTimer) {
+                    document.getElementById('qrStatus').textContent = st.message || '登录失败，请刷新重试';
+                }
+            } catch (e) {}
+        }
+
+        async function ensureLogin() {
+            const r = await fetch('/api/cookie/status');
+            const st = await r.json();
+            updateCookieBadge(st);
+            if (st.status === 'valid') return true;
+
+            showQrOverlay(true);
+            setQrImage('');
+            document.getElementById('qrStatus').textContent = '正在生成二维码...';
+            await fetch('/api/cookie/qrcode', { method: 'POST' });
+
+            if (!pollTimer) {
+                pollTimer = setInterval(pollCookieStatus, 1500);
+            }
+            pollCookieStatus();
+            return false;
+        }
+
+        async function initApp() {
+            try {
+                const r = await fetch('/api/version');
+                const d = await r.json();
+                document.getElementById('version').textContent = d.version || 'v2.0.0';
+            } catch (e) {}
+
+            const st = await (await fetch('/api/cookie/status')).json();
+            updateCookieBadge(st);
+            if (st.status !== 'valid') {
+                await ensureLogin();
+            } else {
+                setInterval(async () => {
+                    const s = await (await fetch('/api/cookie/status')).json();
+                    updateCookieBadge(s);
+                    if (s.status === 'invalid') await ensureLogin();
+                }, 60000);
+            }
+        }
+
+        function showResult(html, type) {
+            const box = document.getElementById('result');
+            document.getElementById('resultBody').innerHTML = html;
+            box.className = 'result show ' + type;
+        }
+
+        async function pasteUrl() {
+            try {
+                document.getElementById('url').value = await navigator.clipboard.readText();
+            } catch (e) {
+                document.getElementById('url').focus();
+            }
+        }
+
+        function clearAll() {
+            document.getElementById('url').value = '';
+            document.getElementById('result').className = 'result';
+            document.getElementById('qualityGroup').classList.remove('show');
+            document.getElementById('downloadBtn').style.display = 'none';
+        }
+
+        function populateQuality(qualities, def) {
+            const sel = document.getElementById('quality');
+            sel.innerHTML = '';
+            const opts = [{ v: 'best', l: '最佳画质' }];
+            (qualities || []).forEach(q => opts.push({ v: String(q), l: q + 'P' }));
+            const seen = new Set();
+            opts.forEach(o => {
+                if (seen.has(o.v)) return;
+                seen.add(o.v);
+                const op = document.createElement('option');
+                op.value = o.v;
+                op.textContent = o.l;
+                if (String(def) === o.v) op.selected = true;
+                sel.appendChild(op);
+            });
+            document.getElementById('qualityGroup').classList.add('show');
+        }
+
+        async function parseVideo() {
+            if (!(await ensureLogin())) return;
+
+            const url = document.getElementById('url').value.trim();
+            if (!url) { showResult('<p>请输入抖音链接</p>', 'err'); return; }
+
+            const btn = document.getElementById('parseBtn');
+            const txt = document.getElementById('parseText');
+            btn.disabled = true;
+            txt.innerHTML = '<span class="loading"></span>解析中...';
+
+            try {
+                const r = await fetch('/api/info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                const d = await r.json();
+                if (d.needLogin) { await ensureLogin(); return; }
+                if (d.success) {
+                    let thumb = '<div style="width:72px;height:72px;background:#eee;border-radius:8px"></div>';
+                    if (d.thumbnail) thumb = '<img src="' + d.thumbnail + '" />';
+                    showResult(
+                        '<div class="video-info">' + thumb +
+                        '<div><div class="video-title">' + escapeHtml(d.title) + '</div>' +
+                        (d.author ? '<div class="video-meta">作者: ' + escapeHtml(d.author) + '</div>' : '') +
+                        '</div></div>', 'ok');
+                    populateQuality(d.qualities, d.defaultQuality);
+                    document.getElementById('downloadBtn').style.display = 'block';
+                } else {
+                    showResult('<p>' + (d.error || '解析失败') + '</p>', 'err');
+                }
+            } catch (e) {
+                showResult('<p>网络错误</p>', 'err');
+            } finally {
+                btn.disabled = false;
+                txt.textContent = '解析视频';
+            }
         }
 
         async function downloadVideo() {
+            if (!(await ensureLogin())) return;
+
             const url = document.getElementById('url').value.trim();
+            const quality = document.getElementById('quality').value;
             const btn = document.getElementById('downloadBtn');
-            const btnText = document.getElementById('btnText');
-            const result = document.getElementById('result');
-            const resultContent = document.getElementById('resultContent');
-
-            if (!url) {
-                result.innerHTML = '<p>请输入视频链接</p>';
-                result.className = 'result error show';
-                return;
-            }
-
+            const txt = document.getElementById('dlText');
             btn.disabled = true;
-            btnText.innerHTML = '<span class="loading"></span>解析中...';
-            result.className = 'result';
+            txt.innerHTML = '<span class="loading"></span>下载中...';
 
             try {
-                const response = await fetch('/api/download', {
+                const r = await fetch('/api/download', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ url })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, quality })
                 });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    let thumbnailHtml = '';
-                    if (data.thumbnail && data.thumbnail.startsWith('http')) {
-                        thumbnailHtml = `
-                            <div class="thumbnail-container">
-                                <img src="${data.thumbnail}" class="video-thumbnail" 
-                                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'video-thumbnail thumbnail-error\'>📷</div>';" />
-                            </div>
-                        `;
-                    } else {
-                        thumbnailHtml = '<div class="video-thumbnail placeholder">📷</div>';
-                    }
-
-                    let html = `
-                        <div class="video-info">
-                            ${thumbnailHtml}
-                            <div class="video-details">
-                                <div class="video-title">${escapeHtml(data.title || '视频')}</div>
-                                ${data.author ? '<div class="video-author">作者: ' + escapeHtml(data.author) + '</div>' : ''}
-                                ${data.fileSize ? '<div class="video-size">大小: ' + formatFileSize(data.fileSize) + '</div>' : ''}
-                            </div>
-                        </div>
-                        <a href="${data.videoUrl}" class="btn-download-video" download>📥 下载视频</a>
-                    `;
-                    resultContent.innerHTML = html;
-                    result.className = 'result success show';
+                const d = await r.json();
+                if (d.needLogin) { await ensureLogin(); return; }
+                if (d.success) {
+                    const mb = (d.fileSize / 1024 / 1024).toFixed(2);
+                    showResult(
+                        document.getElementById('resultBody').innerHTML +
+                        '<p style="margin-top:10px">大小: ' + mb + ' MB</p>' +
+                        '<a class="btn-dl" href="' + d.videoUrl + '" download>📥 保存视频</a>', 'ok');
                 } else {
-                    let errorMsg = data.error || '下载失败';
-                    let isWarning = errorMsg.includes('⚠️');
-                    resultContent.innerHTML = '<p>' + errorMsg + '</p>';
-                    result.className = isWarning ? 'result warning show' : 'result error show';
-                }
-            } catch (error) {
-                resultContent.innerHTML = '<p>网络错误，请稍后重试</p>';
-                result.className = 'result error show';
-            } finally {
-                btn.disabled = false;
-                btnText.innerHTML = '解析视频';
-            }
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        document.getElementById('url').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                downloadVideo();
-            }
-        });
-
-        async function checkVersion() {
-            try {
-                const response = await fetch('/api/version');
-                const data = await response.json();
-                document.getElementById('version').textContent = data.version;
-                
-                const nodeStatus = document.getElementById('nodeStatus');
-                if (data.node_available) {
-                    nodeStatus.textContent = '✅ Node.js 已就绪';
-                    nodeStatus.className = 'node-status available';
-                } else {
-                    nodeStatus.textContent = '❌ Node.js 未配置';
-                    nodeStatus.className = 'node-status unavailable';
+                    showResult('<p>' + (d.error || '下载失败') + '</p>', 'err');
                 }
             } catch (e) {
-                console.log('无法获取版本信息');
+                showResult('<p>网络错误</p>', 'err');
+            } finally {
+                btn.disabled = false;
+                txt.textContent = '下载视频';
             }
         }
 
-        checkVersion();
+        function escapeHtml(t) {
+            const d = document.createElement('div');
+            d.textContent = t;
+            return d.innerHTML;
+        }
+
+        document.getElementById('url').addEventListener('keypress', e => {
+            if (e.key === 'Enter') parseVideo();
+        });
+
+        initApp();
     </script>
 </body>
 </html>
