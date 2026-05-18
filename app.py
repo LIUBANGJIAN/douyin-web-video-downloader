@@ -5,10 +5,11 @@ import uuid
 import re
 import subprocess
 import sys
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
-APP_VERSION = "v1.4.0"
+APP_VERSION = "v1.5.0"
 
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
@@ -71,14 +72,69 @@ def extract_url(text):
     
     return text.strip()
 
-def get_site_type(url):
-    if 'douyin' in url.lower() or 'v.douyin' in url.lower():
-        return 'douyin'
-    elif 'bilibili' in url.lower() or 'bilibili.com' in url.lower():
-        return 'bilibili'
-    elif 'youtube' in url.lower() or 'youtu.be' in url.lower():
-        return 'youtube'
-    return 'other'
+def get_site_info(url):
+    parsed = urlparse(url)
+    domain = parsed.netloc.lower()
+    
+    if 'douyin' in domain or 'v.douyin' in domain:
+        return {
+            'type': 'douyin',
+            'name': '抖音',
+            'referer': 'https://www.douyin.com/'
+        }
+    elif 'bilibili' in domain or 'bilibili.com' in domain:
+        return {
+            'type': 'bilibili',
+            'name': 'B站',
+            'referer': 'https://www.bilibili.com/'
+        }
+    elif 'youtube' in domain or 'youtu.be' in domain:
+        return {
+            'type': 'youtube',
+            'name': 'YouTube',
+            'referer': 'https://www.youtube.com/'
+        }
+    elif 'kuaishou' in domain or 'kuaishou.com' in domain:
+        return {
+            'type': 'kuaishou',
+            'name': '快手',
+            'referer': 'https://www.kuaishou.com/'
+        }
+    elif 'xiaohongshu' in domain or 'xiaohongshu.com' in domain:
+        return {
+            'type': 'xiaohongshu',
+            'name': '小红书',
+            'referer': 'https://www.xiaohongshu.com/'
+        }
+    elif 'weibo' in domain or 'weibo.com' in domain:
+        return {
+            'type': 'weibo',
+            'name': '微博',
+            'referer': 'https://weibo.com/'
+        }
+    elif 'tiktok' in domain:
+        return {
+            'type': 'tiktok',
+            'name': 'TikTok',
+            'referer': 'https://www.tiktok.com/'
+        }
+    
+    return {
+        'type': 'other',
+        'name': '其他',
+        'referer': f'{parsed.scheme}://{domain}/'
+    }
+
+def get_global_headers(site_info):
+    headers = [
+        'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        f'Referer: {site_info["referer"]}'
+    ]
+    return headers
+
+def get_user_agent():
+    return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
 @app.route('/api/download', methods=['POST'])
 def download_video():
@@ -97,23 +153,40 @@ def download_video():
         video_id = str(uuid.uuid4())
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], f'{video_id}.%(ext)s')
         
-        site_type = get_site_type(clean_url)
+        site_info = get_site_info(clean_url)
+        site_type = site_info['type']
         
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'bestvideo[ext=mp4][height<=2160]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': output_path,
             'quiet': False,
             'no_warnings': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'user_agent': get_user_agent(),
+            'http_headers': {
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Referer': site_info['referer'],
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+                'Sec-Ch-Ua-Mobile': '?0',
+                'Sec-Ch-Ua-Platform': '"Windows"',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'same-origin',
+                'Sec-Fetch-User': '?1',
+                'Upgrade-Insecure-Requests': '1',
+            },
             'ignoreerrors': False,
-            'retries': 2,
+            'retries': 3,
             'merge_output_format': 'mp4',
-            'timeout': 60,
+            'timeout': 120,
+            'extractor_args': {},
         }
         
         if site_type == 'bilibili':
             ydl_opts.update({
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+                'format': 'bestvideo[ext=mp4][height<=2160]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
@@ -121,9 +194,12 @@ def download_video():
             })
         elif site_type == 'douyin':
             ydl_opts.update({
-                'extractor_args': {
-                    'douyin': ['--no-check-certificate']
-                },
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            })
+            ydl_opts['extractor_args']['douyin'] = ['--no-check-certificate']
+        elif site_type == 'youtube':
+            ydl_opts.update({
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
             })
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -145,6 +221,7 @@ def download_video():
             
             if os.path.exists(video_file):
                 file_size = os.path.getsize(video_file)
+                resolution = info.get('height', '')
                 return jsonify({
                     'success': True,
                     'videoUrl': video_url,
@@ -153,8 +230,11 @@ def download_video():
                     'ext': video_ext,
                     'thumbnail': thumbnail,
                     'fileSize': file_size,
+                    'resolution': resolution,
                     'version': APP_VERSION,
-                    'nodeAvailable': NODE_AVAILABLE
+                    'nodeAvailable': NODE_AVAILABLE,
+                    'siteType': site_type,
+                    'siteName': site_info['name']
                 })
             else:
                 return jsonify({'error': '视频下载失败'}), 500
@@ -171,7 +251,6 @@ def download_video():
             else:
                 error_msg = '⚠️ 该视频需要登录才能下载，请尝试其他视频'
         elif 'format' in error_lower and 'available' in error_lower:
-            error_msg = '⚠️ 当前格式不可用，正在尝试其他格式...'
             return download_fallback(clean_url, video_id)
         
         return jsonify({'error': error_msg}), 500
@@ -179,15 +258,21 @@ def download_video():
 def download_fallback(url, video_id):
     try:
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], f'{video_id}_fallback.%(ext)s')
+        site_info = get_site_info(url)
         
         ydl_opts = {
             'format': 'best',
             'outtmpl': output_path,
             'quiet': False,
             'no_warnings': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'user_agent': get_user_agent(),
+            'http_headers': {
+                'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Referer': site_info['referer'],
+            },
             'retries': 1,
-            'timeout': 30,
+            'timeout': 60,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -205,6 +290,7 @@ def download_fallback(url, video_id):
                 thumbnail = ''
             
             if os.path.exists(video_file):
+                file_size = os.path.getsize(video_file)
                 return jsonify({
                     'success': True,
                     'videoUrl': f'/download/{video_id}_fallback.{video_ext}',
@@ -212,6 +298,7 @@ def download_fallback(url, video_id):
                     'author': info.get('uploader', ''),
                     'ext': video_ext,
                     'thumbnail': thumbnail,
+                    'fileSize': file_size,
                     'version': APP_VERSION,
                     'nodeAvailable': NODE_AVAILABLE
                 })
