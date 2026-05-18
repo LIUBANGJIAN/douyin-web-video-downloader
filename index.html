@@ -49,6 +49,16 @@
       text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
     }
 
+    .version-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
     .card {
       background: white;
       border-radius: 20px;
@@ -68,8 +78,13 @@
       font-weight: 500;
     }
 
-    .input-group input {
-      width: 100%;
+    .input-wrapper {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-wrapper input {
+      flex: 1;
       padding: 15px;
       border: 2px solid #eee;
       border-radius: 12px;
@@ -78,13 +93,18 @@
       outline: none;
     }
 
-    .input-group input:focus {
+    .input-wrapper input:focus {
       border-color: #6366f1;
       box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
 
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
     .btn {
-      width: 100%;
+      flex: 1;
       padding: 15px;
       background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
       color: white;
@@ -110,6 +130,20 @@
       opacity: 0.7;
       cursor: not-allowed;
       transform: none;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+    }
+
+    .btn-secondary:hover {
+      box-shadow: 0 5px 20px rgba(100, 116, 139, 0.4);
+    }
+
+    .btn-sm {
+      flex: 0 0 auto;
+      padding: 15px 20px;
+      font-size: 14px;
     }
 
     .result {
@@ -273,12 +307,17 @@
     <div class="logo">
       <div class="icon">📥</div>
       <h1>视频下载器</h1>
+      <div class="version-badge" id="version">v1.3.0</div>
     </div>
 
     <div class="card">
       <div class="input-group">
         <label for="url">视频链接</label>
-        <input type="text" id="url" placeholder="粘贴抖音、YouTube、B站等视频链接">
+        <div class="input-wrapper">
+          <input type="text" id="url" placeholder="粘贴抖音、YouTube、B站等视频链接">
+          <button class="btn btn-sm btn-secondary" id="pasteBtn">粘贴</button>
+          <button class="btn btn-sm btn-secondary" id="clearBtn">清空</button>
+        </div>
       </div>
 
       <button class="btn" id="parseBtn">解析视频</button>
@@ -304,8 +343,8 @@
         <ul>
           <li>1. 打开视频网站，找到想要下载的视频</li>
           <li>2. 点击分享按钮，选择"复制链接"</li>
-          <li>3. 回到本页面，粘贴链接并点击解析</li>
-          <li>4. 点击下载按钮，保存视频</li>
+          <li>3. 回到本页面，点击粘贴按钮或手动粘贴链接</li>
+          <li>4. 点击解析按钮，然后点击下载保存视频</li>
         </ul>
       </div>
 
@@ -332,6 +371,8 @@
   <script>
     const urlInput = document.getElementById('url');
     const parseBtn = document.getElementById('parseBtn');
+    const pasteBtn = document.getElementById('pasteBtn');
+    const clearBtn = document.getElementById('clearBtn');
     const loading = document.getElementById('loading');
     const error = document.getElementById('error');
     const result = document.getElementById('result');
@@ -339,6 +380,33 @@
     const title = document.getElementById('title');
     const author = document.getElementById('author');
     const downloadBtn = document.getElementById('downloadBtn');
+    const versionBadge = document.getElementById('version');
+
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => {
+        if (data.version) {
+          versionBadge.textContent = data.version;
+        }
+      })
+      .catch(() => {});
+
+    pasteBtn.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        urlInput.value = text;
+        hideError();
+      } catch (err) {
+        showError('无法访问剪贴板，请手动粘贴');
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      urlInput.value = '';
+      hideError();
+      hideResult();
+      urlInput.focus();
+    });
 
     parseBtn.addEventListener('click', async () => {
       const url = urlInput.value.trim();
@@ -375,6 +443,10 @@
           downloadBtn.href = data.videoUrl;
           downloadBtn.download = `${data.title || '视频'}.${data.ext || 'mp4'}`;
           
+          if (data.version) {
+            versionBadge.textContent = data.version;
+          }
+          
           hideLoading();
           showResult();
         } else {
@@ -386,12 +458,19 @@
       }
     });
 
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        parseBtn.click();
+      }
+    });
+
     function isValidUrl(string) {
+      if (!string.includes('http')) return false;
       try {
         new URL(string);
         return true;
       } catch (_) {
-        return false;  
+        return /https?:\/\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+/.test(string);
       }
     }
 
