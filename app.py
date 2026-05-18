@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_file
 import yt_dlp
 import os
 import uuid
+import re
 
 app = Flask(__name__)
 
@@ -15,18 +16,12 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 def index():
     return send_file('index.html')
 
-def extract_douyin_url(text):
-    import re
-    patterns = [
-        r'https?://v\.douyin\.com/[a-zA-Z0-9_-]+/?',
-        r'https?://www\.douyin\.com/video/[a-zA-Z0-9_-]+/?',
-        r'https?://douyin\.com/video/[a-zA-Z0-9_-]+/?',
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(0)
-    return None
+def extract_url(text):
+    url_pattern = r'https?://[^\s]+'
+    match = re.search(url_pattern, text)
+    if match:
+        return match.group(0).rstrip('.,')
+    return text.strip()
 
 @app.route('/api/download', methods=['POST'])
 def download_video():
@@ -35,11 +30,12 @@ def download_video():
         url = data.get('url', '')
         
         if not url:
-            return jsonify({'error': '请输入抖音视频链接'}), 400
+            return jsonify({'error': '请输入视频链接'}), 400
         
-        clean_url = extract_douyin_url(url)
+        clean_url = extract_url(url)
+        
         if not clean_url:
-            return jsonify({'error': '无法从文本中提取有效的抖音视频链接'}), 400
+            return jsonify({'error': '无法从文本中提取有效的视频链接'}), 400
         
         video_id = str(uuid.uuid4())
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], f'{video_id}.%(ext)s')
@@ -55,22 +51,26 @@ def download_video():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(clean_url, download=True)
             
-            video_title = info.get('title', '抖音视频')
+            video_title = info.get('title', '视频')
             video_ext = info.get('ext', 'mp4')
             video_file = os.path.join(app.config['UPLOAD_FOLDER'], f'{video_id}.{video_ext}')
+            video_thumbnail = info.get('thumbnail', '')
             
             if os.path.exists(video_file):
                 return jsonify({
                     'success': True,
                     'videoUrl': f'/download/{video_id}.{video_ext}',
                     'title': video_title,
-                    'author': info.get('uploader', '')
+                    'author': info.get('uploader', ''),
+                    'ext': video_ext,
+                    'thumbnail': video_thumbnail
                 })
             else:
                 return jsonify({'error': '视频下载失败'}), 500
                 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = str(e)
+        return jsonify({'error': error_msg}), 500
 
 @app.route('/download/<filename>')
 def serve_download(filename):
