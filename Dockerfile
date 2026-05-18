@@ -19,7 +19,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     playwright install chromium
 
-COPY app.py cookie_manager.py douyin_client.py index.html ./
+COPY app.py cookie_manager.py douyin_client.py index.html douyin_config_template.yaml ./
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && mkdir -p /data/douyin /app/downloads

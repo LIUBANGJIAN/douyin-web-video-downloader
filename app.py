@@ -113,7 +113,7 @@ def download_video():
         return jsonify({'error': msg}), 500
 
 
-@app.route('/download/<filename>')}]}
+@app.route('/download/<filename>')
 def serve_download(filename):
     safe = os.path.basename(filename)
     return send_file(

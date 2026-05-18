@@ -226,7 +226,7 @@ def _run_qr_login():
 
 
 def start_qr_login():
-    global _login_thread, _status
+    global _login_thread, _status, _qr_base64, _message
     with _lock:
         if _status == 'scanning':
             return get_status()

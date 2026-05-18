@@ -143,7 +143,7 @@ def _pick_play_url(aweme, quality):
 
 def parse_video_info(share_text):
     url = extract_douyin_url(share_text)
-    if 'douyin' not in url and 'http' not in url:
+    if 'douyin' not in url:
         raise ValueError('请输入有效的抖音链接')
 
     data = fetch_hybrid(url, minimal=False)

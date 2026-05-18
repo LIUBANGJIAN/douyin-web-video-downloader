@@ -3,8 +3,8 @@ set -e
 
 mkdir -p /data/douyin /app/downloads
 
-if [ ! -f /data/douyin/config.yaml ]; then
-  printf 'Cookie: ""\n' > /data/douyin/config.yaml
+if [ ! -f /data/douyin/config.yaml ] || ! grep -q '^TokenManager:' /data/douyin/config.yaml; then
+  cp /app/douyin_config_template.yaml /data/douyin/config.yaml
 fi
 
 mkdir -p /douyin-api/crawlers/douyin/web
