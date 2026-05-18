@@ -6,7 +6,7 @@ import re
 
 app = Flask(__name__)
 
-APP_VERSION = "v1.3.3"
+APP_VERSION = "v1.3.4"
 
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
@@ -52,6 +52,7 @@ def download_video():
     try:
         data = request.get_json()
         url = data.get('url', '')
+        cookies = data.get('cookies', '')
         
         if not url:
             return jsonify({'error': '请输入视频链接'}), 400
@@ -78,6 +79,10 @@ def download_video():
                 'preferedformat': 'mp4',
             }],
         }
+        
+        if cookies:
+            ydl_opts['cookiefile'] = None
+            ydl_opts['cookies'] = cookies
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(clean_url, download=True)

@@ -1,505 +1,538 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>视频下载器 - 支持抖音、YouTube等1000+网站</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频下载器 - 支持抖音、YouTube等1000+网站</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
 
-    .container {
-      max-width: 500px;
-      margin: 0 auto;
-      padding-top: 60px;
-    }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding-top: 40px;
+        }
 
-    .logo {
-      text-align: center;
-      margin-bottom: 30px;
-    }
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
 
-    .logo .icon {
-      width: 80px;
-      height: 80px;
-      border-radius: 20px;
-      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
-      margin: 0 auto;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 40px;
-    }
+        .logo .icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+        }
 
-    .logo h1 {
-      color: white;
-      font-size: 24px;
-      margin-top: 15px;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    }
+        .logo h1 {
+            color: white;
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
 
-    .version-badge {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      padding: 4px 10px;
-      border-radius: 10px;
-      font-size: 12px;
-      margin-top: 8px;
-    }
+        .version-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
 
-    .card {
-      background: white;
-      border-radius: 20px;
-      padding: 30px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
 
-    .input-group {
-      margin-bottom: 20px;
-    }
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
 
-    .input-group label {
-      display: block;
-      color: #333;
-      font-size: 14px;
-      margin-bottom: 10px;
-      font-weight: 500;
-    }
+        .input-group label {
+            display: block;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
 
-    .input-wrapper {
-      display: flex;
-      gap: 10px;
-    }
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background: #f9f9f9;
+        }
 
-    .input-wrapper input {
-      flex: 1;
-      padding: 15px;
-      border: 2px solid #eee;
-      border-radius: 12px;
-      font-size: 16px;
-      transition: all 0.3s ease;
-      outline: none;
-    }
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
 
-    .input-wrapper input:focus {
-      border-color: #6366f1;
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    }
+        .input-group-row {
+            display: flex;
+            gap: 10px;
+        }
 
-    .btn-group {
-      display: flex;
-      gap: 10px;
-    }
+        .input-group-row button {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
 
-    .btn {
-      flex: 1;
-      padding: 15px;
-      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      margin-bottom: 15px;
-    }
+        .btn-paste {
+            background: #f0f0f0;
+            color: #666;
+        }
 
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 20px rgba(99, 102, 241, 0.4);
-    }
+        .btn-paste:hover {
+            background: #e0e0e0;
+        }
 
-    .btn:active {
-      transform: translateY(0);
-    }
+        .btn-clear {
+            background: #f0f0f0;
+            color: #666;
+        }
 
-    .btn:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-      transform: none;
-    }
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
 
-    .btn-secondary {
-      background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
-    }
+        .btn-download {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
 
-    .btn-secondary:hover {
-      box-shadow: 0 5px 20px rgba(100, 116, 139, 0.4);
-    }
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
 
-    .btn-sm {
-      flex: 0 0 auto;
-      padding: 15px 20px;
-      font-size: 14px;
-    }
+        .btn-download:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
 
-    .result {
-      display: none;
-      margin-top: 25px;
-      padding-top: 25px;
-      border-top: 1px solid #eee;
-    }
+        .btn-download svg {
+            margin-right: 8px;
+        }
 
-    .result.show {
-      display: block;
-    }
+        .result {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            display: none;
+        }
 
-    .video-info {
-      margin-bottom: 20px;
-    }
+        .result.success {
+            background: #e8f5e9;
+            border: 1px solid #c8e6c9;
+        }
 
-    .video-cover {
-      width: 100%;
-      border-radius: 12px;
-      margin-bottom: 15px;
-    }
+        .result.error {
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+        }
 
-    .video-title {
-      color: #333;
-      font-size: 16px;
-      margin-bottom: 8px;
-      line-height: 1.5;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
+        .result.warning {
+            background: #fff8e1;
+            border: 1px solid #ffecb3;
+        }
 
-    .video-author {
-      color: #999;
-      font-size: 14px;
-    }
+        .result.show {
+            display: block;
+        }
 
-    .download-btn {
-      display: inline-block;
-      width: 100%;
-      padding: 15px;
-      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-      color: white;
-      text-decoration: none;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: 600;
-      text-align: center;
-      transition: all 0.3s ease;
-    }
+        .result p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
 
-    .download-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
-    }
+        .result.success p {
+            color: #2e7d32;
+        }
 
-    .loading {
-      display: none;
-      text-align: center;
-      padding: 20px;
-    }
+        .result.error p {
+            color: #c62828;
+        }
 
-    .loading.show {
-      display: block;
-    }
+        .result.warning p {
+            color: #f57c00;
+        }
 
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #6366f1;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 15px;
-    }
+        .video-info {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+        .video-thumbnail {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
 
-    .error {
-      display: none;
-      background: #fff5f5;
-      border: 1px solid #ffe5e5;
-      color: #dc2626;
-      padding: 15px;
-      border-radius: 12px;
-      margin-top: 15px;
-      font-size: 14px;
-    }
+        .video-details {
+            flex: 1;
+        }
 
-    .error.show {
-      display: block;
-    }
+        .video-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
 
-    .tips {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      color: #166534;
-      padding: 15px;
-      border-radius: 12px;
-      margin-top: 20px;
-      font-size: 14px;
-      line-height: 1.6;
-    }
+        .video-author {
+            font-size: 12px;
+            color: #999;
+        }
 
-    .tips h3 {
-      font-size: 14px;
-      margin-bottom: 10px;
-    }
+        .btn-download-video {
+            display: inline-block;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
 
-    .tips ul {
-      padding-left: 20px;
-    }
+        .btn-download-video:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
 
-    .tips li {
-      margin-bottom: 5px;
-    }
+        .tutorial {
+            background: #f1f8e9;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
 
-    .supported-sites {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1e40af;
-      padding: 15px;
-      border-radius: 12px;
-      margin-top: 15px;
-      font-size: 13px;
-    }
+        .tutorial h3 {
+            color: #388e3c;
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
 
-    .supported-sites h3 {
-      font-size: 13px;
-      margin-bottom: 8px;
-    }
+        .tutorial h3 svg {
+            margin-right: 8px;
+        }
 
-    .site-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
+        .tutorial ol {
+            padding-left: 20px;
+        }
 
-    .site-tag {
-      background: #dbeafe;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-    }
+        .tutorial li {
+            color: #555;
+            font-size: 14px;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
 
-    .footer {
-      text-align: center;
-      margin-top: 30px;
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 12px;
-    }
-  </style>
+        .supported-sites {
+            background: #e3f2fd;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .supported-sites h3 {
+            color: #1976d2;
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .supported-sites h3 svg {
+            margin-right: 8px;
+        }
+
+        .site-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .site-tag {
+            background: rgba(255, 255, 255, 0.8);
+            color: #1976d2;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .site-tag.more {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+        }
+
+        .footer a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .cookies-info {
+            font-size: 12px;
+            color: #999;
+            margin-top: 8px;
+        }
+
+        .cookies-info a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .cookies-info a:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="logo">
-      <div class="icon">📥</div>
-      <h1>视频下载器</h1>
-      <div class="version-badge" id="version">v1.3.3</div>
+    <div class="container">
+        <div class="logo">
+            <div class="icon">📥</div>
+            <h1>视频下载器</h1>
+            <div class="version-badge" id="version">v1.3.4</div>
+        </div>
+
+        <div class="card">
+            <div class="input-group">
+                <label for="url">视频链接</label>
+                <div class="input-group-row">
+                    <input type="text" id="url" placeholder="粘贴抖音、YouTube、B站等视频链接">
+                    <button class="btn-paste" onclick="pasteUrl()">粘贴</button>
+                    <button class="btn-clear" onclick="clearUrl()">清空</button>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label for="cookies">抖音 Cookies（可选）</label>
+                <input type="text" id="cookies" placeholder="抖音网页端 cookies，用于下载受限视频">
+                <div class="cookies-info">
+                    <a href="#" onclick="showCookiesHelp(); return false;">如何获取抖音 cookies？</a>
+                </div>
+            </div>
+
+            <button class="btn-download" id="downloadBtn" onclick="downloadVideo()">
+                <span id="btnText">解析视频</span>
+            </button>
+
+            <div class="result" id="result">
+                <div id="resultContent"></div>
+            </div>
+
+            <div class="tutorial">
+                <h3>📖 使用教程</h3>
+                <ol>
+                    <li>打开视频网站，找到想要下载的视频</li>
+                    <li>点击分享按钮，选择"复制链接"</li>
+                    <li>回到本页面，粘贴链接并点击解析</li>
+                    <li>点击下载按钮，保存视频到相册</li>
+                </ol>
+            </div>
+
+            <div class="supported-sites">
+                <h3>🌐 支持的网站</h3>
+                <div class="site-tags">
+                    <span class="site-tag">抖音</span>
+                    <span class="site-tag">YouTube</span>
+                    <span class="site-tag">B站</span>
+                    <span class="site-tag">快手</span>
+                    <span class="site-tag">微博</span>
+                    <span class="site-tag">小红书</span>
+                    <span class="site-tag">TikTok</span>
+                    <span class="site-tag more">更多...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>基于 yt-dlp | 支持 1000+ 视频网站 | 仅用于个人学习</p>
+        </div>
     </div>
 
-    <div class="card">
-      <div class="input-group">
-        <label for="url">视频链接</label>
-        <div class="input-wrapper">
-          <input type="text" id="url" placeholder="粘贴抖音、YouTube、B站等视频链接">
-          <button class="btn btn-sm btn-secondary" id="pasteBtn">粘贴</button>
-          <button class="btn btn-sm btn-secondary" id="clearBtn">清空</button>
+    <div id="cookiesModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+        <div style="background:white;border-radius:16px;padding:24px;margin:20px;max-width:400px;">
+            <h3 style="margin-bottom:16px;color:#333;">🎯 如何获取抖音 Cookies</h3>
+            <ol style="padding-left:20px;color:#555;font-size:14px;line-height:1.8;">
+                <li>打开电脑浏览器，访问 <a href="https://www.douyin.com" target="_blank" style="color:#667eea;">抖音网页版</a></li>
+                <li>登录你的抖音账号</li>
+                <li>按 F12 打开开发者工具</li>
+                <li>切换到 Application / Cookies 标签</li>
+                <li>找到 www.douyin.com 的 cookies</li>
+                <li>复制所有 cookies（格式：key1=value1; key2=value2; ...）</li>
+                <li>粘贴到上方输入框中</li>
+            </ol>
+            <button onclick="document.getElementById('cookiesModal').style.display='none'" style="margin-top:20px;padding:10px 24px;background:#667eea;color:white;border:none;border-radius:8px;cursor:pointer;">知道了</button>
         </div>
-      </div>
-
-      <button class="btn" id="parseBtn">解析视频</button>
-
-      <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p>正在解析中...</p>
-      </div>
-
-      <div class="error" id="error"></div>
-
-      <div class="result" id="result">
-        <div class="video-info">
-          <img class="video-cover" id="cover" src="" alt="视频封面">
-          <div class="video-title" id="title"></div>
-          <div class="video-author" id="author"></div>
-        </div>
-        <a class="download-btn" id="downloadBtn" href="#" download>下载视频</a>
-      </div>
-
-      <div class="tips">
-        <h3>📱 使用教程</h3>
-        <ul>
-          <li>1. 打开视频网站，找到想要下载的视频</li>
-          <li>2. 点击分享按钮，选择"复制链接"</li>
-          <li>3. 回到本页面，点击粘贴按钮或手动粘贴链接</li>
-          <li>4. 点击解析按钮，然后点击下载保存视频</li>
-        </ul>
-      </div>
-
-      <div class="supported-sites">
-        <h3>🌐 支持的网站</h3>
-        <div class="site-tags">
-          <span class="site-tag">抖音</span>
-          <span class="site-tag">YouTube</span>
-          <span class="site-tag">B站</span>
-          <span class="site-tag">快手</span>
-          <span class="site-tag">微博</span>
-          <span class="site-tag">小红书</span>
-          <span class="site-tag">TikTok</span>
-          <span class="site-tag">更多...</span>
-        </div>
-      </div>
     </div>
 
-    <div class="footer">
-      <p>基于 yt-dlp | 支持1000+视频网站 | 仅用于个人学习</p>
-    </div>
-  </div>
-
-  <script>
-    const urlInput = document.getElementById('url');
-    const parseBtn = document.getElementById('parseBtn');
-    const pasteBtn = document.getElementById('pasteBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const loading = document.getElementById('loading');
-    const error = document.getElementById('error');
-    const result = document.getElementById('result');
-    const cover = document.getElementById('cover');
-    const title = document.getElementById('title');
-    const author = document.getElementById('author');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const versionBadge = document.getElementById('version');
-
-    fetch('/api/version')
-      .then(res => res.json())
-      .then(data => {
-        if (data.version) {
-          versionBadge.textContent = data.version;
+    <script>
+        function showCookiesHelp() {
+            document.getElementById('cookiesModal').style.display = 'flex';
         }
-      })
-      .catch(() => {});
 
-    pasteBtn.addEventListener('click', async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        urlInput.value = text;
-        hideError();
-      } catch (err) {
-        urlInput.focus();
-      }
-    });
+        async function pasteUrl() {
+            const input = document.getElementById('url');
+            try {
+                const text = await navigator.clipboard.readText();
+                input.value = text;
+                input.focus();
+            } catch (err) {
+                input.focus();
+            }
+        }
 
-    clearBtn.addEventListener('click', () => {
-      urlInput.value = '';
-      hideError();
-      hideResult();
-      urlInput.focus();
-    });
+        function clearUrl() {
+            document.getElementById('url').value = '';
+            document.getElementById('cookies').value = '';
+            document.getElementById('result').classList.remove('show', 'success', 'error', 'warning');
+            document.getElementById('url').focus();
+        }
 
-    parseBtn.addEventListener('click', async () => {
-      const url = urlInput.value.trim();
-      
-      if (!url) {
-        showError('请输入视频链接');
-        return;
-      }
+        async function downloadVideo() {
+            const url = document.getElementById('url').value.trim();
+            const cookies = document.getElementById('cookies').value.trim();
+            const btn = document.getElementById('downloadBtn');
+            const btnText = document.getElementById('btnText');
+            const result = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
 
-      if (!isValidUrl(url)) {
-        showError('请输入有效的视频链接');
-        return;
-      }
+            if (!url) {
+                result.innerHTML = '<p>请输入视频链接</p>';
+                result.className = 'result error show';
+                return;
+            }
 
-      hideError();
-      showLoading();
-      hideResult();
+            btn.disabled = true;
+            btnText.innerHTML = '<span class="loading"></span>解析中...';
+            result.className = 'result';
 
-      try {
-        const response = await fetch('/api/download', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ url })
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url, cookies })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    let html = `
+                        <div class="video-info">
+                            ${data.thumbnail ? '<img src="' + data.thumbnail + '" class="video-thumbnail" />' : ''}
+                            <div class="video-details">
+                                <div class="video-title">${data.title || '视频'}</div>
+                                ${data.author ? '<div class="video-author">作者: ' + data.author + '</div>' : ''}
+                            </div>
+                        </div>
+                        <a href="${data.videoUrl}" class="btn-download-video" download>📥 下载视频</a>
+                    `;
+                    resultContent.innerHTML = html;
+                    result.className = 'result success show';
+                } else {
+                    let errorMsg = data.error || '下载失败';
+                    let isWarning = false;
+                    
+                    if (errorMsg.includes('cookies') || errorMsg.includes('Cookie')) {
+                        errorMsg = '⚠️ 需要抖音 Cookies 才能下载此视频\n\n请在上方输入框中填写抖音网页端的 cookies。点击"如何获取抖音 cookies？"查看教程。';
+                        isWarning = true;
+                    }
+                    
+                    resultContent.innerHTML = '<p>' + errorMsg + '</p>';
+                    result.className = isWarning ? 'result warning show' : 'result error show';
+                }
+            } catch (error) {
+                resultContent.innerHTML = '<p>网络错误，请稍后重试</p>';
+                result.className = 'result error show';
+            } finally {
+                btn.disabled = false;
+                btnText.innerHTML = '解析视频';
+            }
+        }
+
+        document.getElementById('url').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                downloadVideo();
+            }
         });
 
-        const data = await response.json();
-
-        if (data.success) {
-          cover.src = data.thumbnail || `https://via.placeholder.com/480x270?text=${encodeURIComponent(data.title)}`;
-          title.textContent = data.title || '视频';
-          author.textContent = data.author ? `作者: ${data.author}` : '';
-          downloadBtn.href = data.videoUrl;
-          downloadBtn.download = `${data.title || '视频'}.${data.ext || 'mp4'}`;
-          
-          if (data.version) {
-            versionBadge.textContent = data.version;
-          }
-          
-          hideLoading();
-          showResult();
-        } else {
-          throw new Error(data.error || '未找到视频信息');
+        async function checkVersion() {
+            try {
+                const response = await fetch('/api/version');
+                const data = await response.json();
+                document.getElementById('version').textContent = data.version;
+            } catch (e) {
+                console.log('无法获取版本信息');
+            }
         }
-      } catch (err) {
-        hideLoading();
-        showError(err.message || '解析失败，请稍后重试');
-      }
-    });
 
-    urlInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        parseBtn.click();
-      }
-    });
-
-    function isValidUrl(string) {
-      if (!string.includes('http')) return false;
-      try {
-        new URL(string);
-        return true;
-      } catch (_) {
-        return /https?:\/\/[\w\-._~:/?#[\]@!$&'()*+,;=%]+/.test(string);
-      }
-    }
-
-    function showLoading() {
-      loading.classList.add('show');
-      parseBtn.disabled = true;
-    }
-
-    function hideLoading() {
-      loading.classList.remove('show');
-      parseBtn.disabled = false;
-    }
-
-    function showError(msg) {
-      error.textContent = msg;
-      error.classList.add('show');
-    }
-
-    function hideError() {
-      error.classList.remove('show');
-    }
-
-    function showResult() {
-      result.classList.add('show');
-    }
-
-    function hideResult() {
-      result.classList.remove('show');
-    }
-  </script>
+        checkVersion();
+    </script>
 </body>
 </html>
