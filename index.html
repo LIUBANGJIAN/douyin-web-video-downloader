@@ -161,6 +161,11 @@
             border: 1px solid #ffcdd2;
         }
 
+        .result.warning {
+            background: #fff8e1;
+            border: 1px solid #ffecb3;
+        }
+
         .result.show {
             display: block;
         }
@@ -176,6 +181,10 @@
 
         .result.error p {
             color: #c62828;
+        }
+
+        .result.warning p {
+            color: #f57c00;
         }
 
         .video-info {
@@ -282,6 +291,20 @@
             background: rgba(255, 255, 255, 0.5);
         }
 
+        .tips {
+            background: #fff3e0;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ff9800;
+        }
+
+        .tips p {
+            color: #e65100;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -319,7 +342,7 @@
         <div class="logo">
             <div class="icon">📥</div>
             <h1>视频下载器</h1>
-            <div class="version-badge" id="version">v1.3.5</div>
+            <div class="version-badge" id="version">v1.3.6</div>
         </div>
 
         <div class="card">
@@ -338,6 +361,10 @@
 
             <div class="result" id="result">
                 <div id="resultContent"></div>
+            </div>
+
+            <div class="tips">
+                <p>💡 提示：部分视频网站（如抖音）可能需要登录才能下载。如果遇到"需要cookies"错误，请尝试其他视频链接。</p>
             </div>
 
             <div class="tutorial">
@@ -384,7 +411,7 @@
 
         function clearUrl() {
             document.getElementById('url').value = '';
-            document.getElementById('result').classList.remove('show', 'success', 'error');
+            document.getElementById('result').classList.remove('show', 'success', 'error', 'warning');
             document.getElementById('url').focus();
         }
 
@@ -430,8 +457,10 @@
                     resultContent.innerHTML = html;
                     result.className = 'result success show';
                 } else {
-                    resultContent.innerHTML = '<p>' + (data.error || '下载失败') + '</p>';
-                    result.className = 'result error show';
+                    let errorMsg = data.error || '下载失败';
+                    let isWarning = errorMsg.includes('⚠️');
+                    resultContent.innerHTML = '<p>' + errorMsg + '</p>';
+                    result.className = isWarning ? 'result warning show' : 'result error show';
                 }
             } catch (error) {
                 resultContent.innerHTML = '<p>网络错误，请稍后重试</p>';

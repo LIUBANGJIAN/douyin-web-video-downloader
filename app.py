@@ -6,7 +6,7 @@ import re
 
 app = Flask(__name__)
 
-APP_VERSION = "v1.3.5"
+APP_VERSION = "v1.3.6"
 
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
@@ -65,7 +65,7 @@ def download_video():
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], f'{video_id}.%(ext)s')
         
         ydl_opts = {
-            'format': 'best',
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': output_path,
             'quiet': False,
             'no_warnings': True,
@@ -77,6 +77,11 @@ def download_video():
                 'key': 'FFmpegVideoConvertor',
                 'preferedformat': 'mp4',
             }],
+            'postprocessor_args': [
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-crf', '23',
+            ],
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -105,6 +110,8 @@ def download_video():
                 
     except Exception as e:
         error_msg = str(e)
+        if 'cookies' in error_msg.lower() or 'Cookie' in error_msg:
+            error_msg = '⚠️ 该视频需要登录才能下载。请尝试其他视频，或在设置中配置抖音 cookies。'
         return jsonify({'error': error_msg}), 500
 
 @app.route('/download/<filename>')
