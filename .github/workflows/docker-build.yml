@@ -21,16 +21,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Update yt-dlp version in requirements.txt
-        run: |
-          LATEST_VERSION=$(pip index versions yt-dlp 2>&1 | grep -oP '(?<=Latest version: )[\d.]+')
-          if [ -n "$LATEST_VERSION" ]; then
-            sed -i "s/yt-dlp==.*/yt-dlp==$LATEST_VERSION/" requirements.txt
-            echo "Updated yt-dlp to latest version: $LATEST_VERSION"
-          else
-            echo "Could not find latest yt-dlp version, using existing"
-          fi
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
