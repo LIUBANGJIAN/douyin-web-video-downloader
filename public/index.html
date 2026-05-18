@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>抖音无水印视频下载</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding-top: 60px;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .logo img {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .logo h1 {
+      color: white;
+      font-size: 24px;
+      margin-top: 15px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    .input-group label {
+      display: block;
+      color: #333;
+      font-size: 14px;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #eee;
+      border-radius: 12px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 15px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .result {
+      display: none;
+      margin-top: 25px;
+      padding-top: 25px;
+      border-top: 1px solid #eee;
+    }
+
+    .result.show {
+      display: block;
+    }
+
+    .video-info {
+      margin-bottom: 20px;
+    }
+
+    .video-cover {
+      width: 100%;
+      border-radius: 12px;
+      margin-bottom: 15px;
+    }
+
+    .video-title {
+      color: #333;
+      font-size: 16px;
+      margin-bottom: 8px;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .video-author {
+      color: #999;
+      font-size: 14px;
+    }
+
+    .download-btn {
+      display: inline-block;
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .download-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(17, 153, 142, 0.4);
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading.show {
+      display: block;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      display: none;
+      background: #fff5f5;
+      border: 1px solid #ffe5e5;
+      color: #dc2626;
+      padding: 15px;
+      border-radius: 12px;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    .error.show {
+      display: block;
+    }
+
+    .tips {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 15px;
+      border-radius: 12px;
+      margin-top: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .tips h3 {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .tips ul {
+      padding-left: 20px;
+    }
+
+    .tips li {
+      margin-bottom: 5px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/14082/douyin-logo.png" alt="抖音图标">
+      <h1>抖音无水印下载</h1>
+    </div>
+
+    <div class="card">
+      <div class="input-group">
+        <label for="url">抖音视频链接</label>
+        <input type="text" id="url" placeholder="请粘贴抖音视频分享链接">
+      </div>
+
+      <button class="btn" id="parseBtn">解析视频</button>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>正在解析中...</p>
+      </div>
+
+      <div class="error" id="error"></div>
+
+      <div class="result" id="result">
+        <div class="video-info">
+          <img class="video-cover" id="cover" src="" alt="视频封面">
+          <div class="video-title" id="title"></div>
+          <div class="video-author" id="author"></div>
+        </div>
+        <a class="download-btn" id="downloadBtn" href="#" download>下载视频</a>
+      </div>
+
+      <div class="tips">
+        <h3>📱 使用教程</h3>
+        <ul>
+          <li>1. 打开抖音，找到想要下载的视频</li>
+          <li>2. 点击分享按钮，选择"复制链接"</li>
+          <li>3. 回到本页面，粘贴链接并点击解析</li>
+          <li>4. 点击下载按钮，保存到相册</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>仅用于个人学习使用 | 请勿侵犯他人版权</p>
+    </div>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById('url');
+    const parseBtn = document.getElementById('parseBtn');
+    const loading = document.getElementById('loading');
+    const error = document.getElementById('error');
+    const result = document.getElementById('result');
+    const cover = document.getElementById('cover');
+    const title = document.getElementById('title');
+    const author = document.getElementById('author');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    parseBtn.addEventListener('click', async () => {
+      const url = urlInput.value.trim();
+      
+      if (!url) {
+        showError('请输入抖音视频链接');
+        return;
+      }
+
+      if (!isValidDouyinUrl(url)) {
+        showError('请输入有效的抖音视频链接');
+        return;
+      }
+
+      hideError();
+      showLoading();
+      hideResult();
+
+      try {
+        const response = await fetch('/api/download', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          cover.src = data.cover;
+          title.textContent = data.title;
+          author.textContent = `作者: ${data.author}`;
+          downloadBtn.href = data.videoUrl;
+          downloadBtn.download = `${data.title || '抖音视频'}.mp4`;
+          
+          hideLoading();
+          showResult();
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (err) {
+        hideLoading();
+        showError(err.message || '解析失败，请稍后重试');
+      }
+    });
+
+    function isValidDouyinUrl(url) {
+      return url.includes('douyin.com') || url.includes('v.douyin.com');
+    }
+
+    function showLoading() {
+      loading.classList.add('show');
+      parseBtn.disabled = true;
+    }
+
+    function hideLoading() {
+      loading.classList.remove('show');
+      parseBtn.disabled = false;
+    }
+
+    function showError(msg) {
+      error.textContent = msg;
+      error.classList.add('show');
+    }
+
+    function hideError() {
+      error.classList.remove('show');
+    }
+
+    function showResult() {
+      result.classList.add('show');
+    }
+
+    function hideResult() {
+      result.classList.remove('show');
+    }
+  </script>
+</body>
+</html>
