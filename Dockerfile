@@ -8,6 +8,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
+RUN node -v && npm -v
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -17,5 +19,7 @@ COPY index.html .
 RUN mkdir -p downloads
 
 EXPOSE 8787
+
+ENV PATH="/usr/bin/node:$PATH"
 
 CMD ["python", "app.py"]

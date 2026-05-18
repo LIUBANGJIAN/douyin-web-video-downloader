@@ -144,10 +144,6 @@
             transform: none;
         }
 
-        .btn-download svg {
-            margin-right: 8px;
-        }
-
         .result {
             margin-bottom: 20px;
             padding: 15px;
@@ -165,11 +161,6 @@
             border: 1px solid #ffcdd2;
         }
 
-        .result.warning {
-            background: #fff8e1;
-            border: 1px solid #ffecb3;
-        }
-
         .result.show {
             display: block;
         }
@@ -185,10 +176,6 @@
 
         .result.error p {
             color: #c62828;
-        }
-
-        .result.warning p {
-            color: #f57c00;
         }
 
         .video-info {
@@ -252,10 +239,6 @@
             align-items: center;
         }
 
-        .tutorial h3 svg {
-            margin-right: 8px;
-        }
-
         .tutorial ol {
             padding-left: 20px;
         }
@@ -279,10 +262,6 @@
             margin-bottom: 15px;
             display: flex;
             align-items: center;
-        }
-
-        .supported-sites h3 svg {
-            margin-right: 8px;
         }
 
         .site-tags {
@@ -319,21 +298,6 @@
             text-decoration: underline;
         }
 
-        .cookies-info {
-            font-size: 12px;
-            color: #999;
-            margin-top: 8px;
-        }
-
-        .cookies-info a {
-            color: #667eea;
-            text-decoration: none;
-        }
-
-        .cookies-info a:hover {
-            text-decoration: underline;
-        }
-
         .loading {
             display: inline-block;
             width: 20px;
@@ -355,7 +319,7 @@
         <div class="logo">
             <div class="icon">📥</div>
             <h1>视频下载器</h1>
-            <div class="version-badge" id="version">v1.3.4</div>
+            <div class="version-badge" id="version">v1.3.5</div>
         </div>
 
         <div class="card">
@@ -365,14 +329,6 @@
                     <input type="text" id="url" placeholder="粘贴抖音、YouTube、B站等视频链接">
                     <button class="btn-paste" onclick="pasteUrl()">粘贴</button>
                     <button class="btn-clear" onclick="clearUrl()">清空</button>
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label for="cookies">抖音 Cookies（可选）</label>
-                <input type="text" id="cookies" placeholder="抖音网页端 cookies，用于下载受限视频">
-                <div class="cookies-info">
-                    <a href="#" onclick="showCookiesHelp(); return false;">如何获取抖音 cookies？</a>
                 </div>
             </div>
 
@@ -414,27 +370,7 @@
         </div>
     </div>
 
-    <div id="cookiesModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
-        <div style="background:white;border-radius:16px;padding:24px;margin:20px;max-width:400px;">
-            <h3 style="margin-bottom:16px;color:#333;">🎯 如何获取抖音 Cookies</h3>
-            <ol style="padding-left:20px;color:#555;font-size:14px;line-height:1.8;">
-                <li>打开电脑浏览器，访问 <a href="https://www.douyin.com" target="_blank" style="color:#667eea;">抖音网页版</a></li>
-                <li>登录你的抖音账号</li>
-                <li>按 F12 打开开发者工具</li>
-                <li>切换到 Application / Cookies 标签</li>
-                <li>找到 www.douyin.com 的 cookies</li>
-                <li>复制所有 cookies（格式：key1=value1; key2=value2; ...）</li>
-                <li>粘贴到上方输入框中</li>
-            </ol>
-            <button onclick="document.getElementById('cookiesModal').style.display='none'" style="margin-top:20px;padding:10px 24px;background:#667eea;color:white;border:none;border-radius:8px;cursor:pointer;">知道了</button>
-        </div>
-    </div>
-
     <script>
-        function showCookiesHelp() {
-            document.getElementById('cookiesModal').style.display = 'flex';
-        }
-
         async function pasteUrl() {
             const input = document.getElementById('url');
             try {
@@ -448,14 +384,12 @@
 
         function clearUrl() {
             document.getElementById('url').value = '';
-            document.getElementById('cookies').value = '';
-            document.getElementById('result').classList.remove('show', 'success', 'error', 'warning');
+            document.getElementById('result').classList.remove('show', 'success', 'error');
             document.getElementById('url').focus();
         }
 
         async function downloadVideo() {
             const url = document.getElementById('url').value.trim();
-            const cookies = document.getElementById('cookies').value.trim();
             const btn = document.getElementById('downloadBtn');
             const btnText = document.getElementById('btnText');
             const result = document.getElementById('result');
@@ -477,7 +411,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ url, cookies })
+                    body: JSON.stringify({ url })
                 });
 
                 const data = await response.json();
@@ -496,16 +430,8 @@
                     resultContent.innerHTML = html;
                     result.className = 'result success show';
                 } else {
-                    let errorMsg = data.error || '下载失败';
-                    let isWarning = false;
-                    
-                    if (errorMsg.includes('cookies') || errorMsg.includes('Cookie')) {
-                        errorMsg = '⚠️ 需要抖音 Cookies 才能下载此视频\n\n请在上方输入框中填写抖音网页端的 cookies。点击"如何获取抖音 cookies？"查看教程。';
-                        isWarning = true;
-                    }
-                    
-                    resultContent.innerHTML = '<p>' + errorMsg + '</p>';
-                    result.className = isWarning ? 'result warning show' : 'result error show';
+                    resultContent.innerHTML = '<p>' + (data.error || '下载失败') + '</p>';
+                    result.className = 'result error show';
                 }
             } catch (error) {
                 resultContent.innerHTML = '<p>网络错误，请稍后重试</p>';
