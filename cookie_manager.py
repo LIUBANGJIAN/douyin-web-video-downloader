@@ -235,11 +235,13 @@ def _run_qr_login():
         return
 
     try:
+        print('[cookie_manager] QR login start')
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
-                args=['--no-sandbox', '--disable-dev-shm-usage'],
+                args=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process'],
             )
+            print('[cookie_manager] browser launched')
             context = browser.new_context(
                 user_agent=(
                     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -247,32 +249,36 @@ def _run_qr_login():
                 ),
                 viewport={'width': 1280, 'height': 900},
                 locale='zh-CN',
+                ignore_https_errors=True,
             )
             page = context.new_page()
-            page.goto('https://www.douyin.com/', wait_until='domcontentloaded', timeout=60000)
-            time.sleep(3)
+            try:
+                page.goto('https://www.douyin.com/login', wait_until='domcontentloaded', timeout=60000)
+                print('[cookie_manager] navigated to login page', page.url)
+            except Exception as e:
+                print('[cookie_manager] login page navigation failed:', e)
+                page.goto('https://www.douyin.com/', wait_until='domcontentloaded', timeout=60000)
+                print('[cookie_manager] fallback to homepage', page.url)
+            time.sleep(5)
 
-            # 尝试打开登录/扫码登录弹窗，如果页面结构发生变化则直接尝试登录链接
             clicked = False
-            for text in ('登录', '扫码登录'):
+            for text in ('登录', '扫码登录', 'QR Code', '二维码'):
                 try:
                     locator = page.get_by_text(text, exact=False)
                     if locator.count() > 0:
                         locator.first.click(timeout=3000)
-                        time.sleep(1)
+                        time.sleep(2)
                         clicked = True
+                        print(f'[cookie_manager] clicked login text: {text}')
                         break
-                except Exception:
+                except Exception as e:
+                    print(f'[cookie_manager] click text "{text}" failed: {e}')
                     continue
 
             if not clicked:
-                try:
-                    page.goto('https://www.douyin.com/login', wait_until='domcontentloaded', timeout=60000)
-                    time.sleep(3)
-                except Exception:
-                    pass
+                print('[cookie_manager] did not click login button, continuing to screenshot')
 
-            time.sleep(2)
+            time.sleep(3)
             png = None
             selectors = [
                 'img[src*="qr"]',
@@ -287,13 +293,17 @@ def _run_qr_login():
                     el = page.wait_for_selector(sel, timeout=5000)
                     if el:
                         png = el.screenshot(type='png')
+                        print(f'[cookie_manager] captured qr through selector: {sel}')
                         break
-                except Exception:
+                except Exception as e:
+                    print(f'[cookie_manager] selector {sel} failed: {e}')
                     continue
 
             if not png:
+                print('[cookie_manager] no qr selector matched, trying fallback screenshot')
                 panel = page.query_selector('div[class*="login"]') or page.query_selector('div[class*="qr"]')
                 png = panel.screenshot(type='png') if panel else page.screenshot(type='png')
+                print('[cookie_manager] fallback screenshot done', 'panel' if panel else 'full page')
 
             with _lock:
                 _qr_base64 = base64.b64encode(png).decode('ascii')
@@ -311,6 +321,7 @@ def _run_qr_login():
                             _sync_cookie_to_backend(header)
                             logged_in = True
                         except Exception as sync_exc:
+                            print('[cookie_manager] sync cookie to backend failed:', sync_exc)
                             with _lock:
                                 _status = 'invalid'
                                 _qr_base64 = ''
@@ -333,6 +344,7 @@ def _run_qr_login():
                     _message = '扫码超时或失败，请重试'
 
     except Exception as e:
+        print('[cookie_manager] QR login failed:', e)
         with _lock:
             _status = 'invalid'
             _qr_base64 = ''
