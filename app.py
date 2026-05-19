@@ -14,7 +14,7 @@ import tempfile
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.2.0'
+APP_VERSION = 'v2.2.1'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 app.config['COOKIES_FILE'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
