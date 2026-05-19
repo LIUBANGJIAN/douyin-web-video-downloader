@@ -1,22 +1,29 @@
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, Response
 from yt_dlp import YoutubeDL
 import re
 import os
 import uuid
 import subprocess
 from urllib.parse import urlparse
+import requests
+import time
+import threading
+import base64
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.0.3'
+APP_VERSION = 'v2.0.5'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
+app.config['COOKIES_FILE'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 NODE_AVAILABLE = False
 NODE_VERSION = ""
 YTDLP_VERSION = ""
+DOUYIN_COOKIES = {}
+LAST_COOKIES_UPDATE = 0
 
 def check_nodejs():
     global NODE_AVAILABLE, NODE_VERSION
@@ -96,9 +103,7 @@ def _sanitize_url(text):
         return ''
     return text.strip()
 
-
 def _extract_url_from_text(text):
-    """从用户粘贴的文本中提取第一个 http(s) URL。"""
     if not text or not isinstance(text, str):
         return ''
     t = text.strip()
@@ -109,7 +114,6 @@ def _extract_url_from_text(text):
         return m.group(0)
     return ''
 
-
 def _quality_format(quality):
     q = str(quality or '').strip()
     if q.lower() in ('best', 'worst', 'source'):
@@ -117,7 +121,6 @@ def _quality_format(quality):
     if q.isdigit():
         return f'bestvideo[height<={q}]+bestaudio/best'
     return q or 'best'
-
 
 def _extract_info(video_url):
     if not video_url:
@@ -134,6 +137,11 @@ def _extract_info(video_url):
         'user_agent': USER_AGENT,
         'http_headers': headers,
     }
+    
+    cookies_file = app.config['COOKIES_FILE']
+    if os.path.exists(cookies_file):
+        ydl_opts['cookiefile'] = cookies_file
+
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(video_url, download=False)
 
@@ -173,7 +181,6 @@ def _extract_info(video_url):
         'siteType': site_info['type'],
     }
 
-
 def _download_video(url, quality, dest_path):
     format_str = _quality_format(quality)
     site_info = get_site_info(url)
@@ -189,26 +196,31 @@ def _download_video(url, quality, dest_path):
         'http_headers': headers,
         'merge_output_format': 'mp4',
     }
+    
+    cookies_file = app.config['COOKIES_FILE']
+    if os.path.exists(cookies_file):
+        ydl_opts['cookiefile'] = cookies_file
+
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
     return info
-
 
 @app.route('/')
 def index():
     return send_file('index.html')
 
-
 @app.route('/api/version')
 def version():
+    cookies_valid = os.path.exists(app.config['COOKIES_FILE']) and (time.time() - LAST_COOKIES_UPDATE) < 3600 * 24
     return jsonify({
         'version': APP_VERSION,
         'backend': 'yt-dlp',
         'node_available': NODE_AVAILABLE,
         'node_version': NODE_VERSION,
         'ytdlp_version': YTDLP_VERSION,
+        'cookies_valid': cookies_valid,
+        'cookies_updated': LAST_COOKIES_UPDATE,
     })
-
 
 @app.route('/api/info', methods=['POST'])
 def video_info():
@@ -226,9 +238,10 @@ def video_info():
             if not NODE_AVAILABLE:
                 error_msg = '⚠️ 服务器 Node.js 环境未配置，无法解析抖音加密参数'
             else:
-                error_msg = '⚠️ 该视频需要登录才能下载，请稍后再试'
+                error_msg = '⚠️ 该视频需要登录才能下载，请先扫码获取Cookie'
+        elif 'Fresh cookies' in error_msg:
+            error_msg = '⚠️ 需要新鲜的抖音Cookie，请点击"扫码获取Cookie"按钮登录'
         return jsonify({'error': error_msg}), 500
-
 
 @app.route('/api/download', methods=['POST'])
 def download_video():
@@ -261,9 +274,10 @@ def download_video():
             if not NODE_AVAILABLE:
                 error_msg = '⚠️ 服务器 Node.js 环境未配置，无法解析抖音加密参数'
             else:
-                error_msg = '⚠️ 该视频需要登录才能下载，请稍后再试'
+                error_msg = '⚠️ 该视频需要登录才能下载，请先扫码获取Cookie'
+        elif 'Fresh cookies' in error_msg:
+            error_msg = '⚠️ 需要新鲜的抖音Cookie，请点击"扫码获取Cookie"按钮登录'
         return jsonify({'error': error_msg}), 500
-
 
 @app.route('/download/<filename>')
 def serve_download(filename):
@@ -273,6 +287,178 @@ def serve_download(filename):
         return jsonify({'error': '文件不存在'}), 404
     return send_file(path, as_attachment=True)
 
+qrcode_session = None
+qrcode_token = None
+
+@app.route('/api/douyin/qrcode', methods=['GET'])
+def get_douyin_qrcode():
+    global qrcode_session, qrcode_token
+    try:
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': USER_AGENT,
+            'Referer': 'https://www.douyin.com/',
+            'Accept': 'application/json, text/plain, */*',
+            'authority': 'sso.douyin.com',
+            'accept-language': 'zh-CN,zh;q=0.9',
+            'origin': 'https://www.douyin.com',
+            'sec-ch-ua': '"Google Chrome";v="117", "Not;A=Brand";v="8", "Chromium";v="117"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-site',
+        })
+        
+        session.cookies.set('passport_csrf_token', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+        session.cookies.set('passport_csrf_token_default', 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+        session.cookies.set('ttwid', '1%7Ci3sIVxIy7lyCW05AUGaw-jXvFfGoIlSl14UrRZnLqAs%7C1696059041%7C738d03352f2f67c16293a49080061ca75ba4eede5ed825db8e4b5360987aa67f')
+        
+        timestamp = str(int(time.time() * 1000))
+        url = f'https://sso.douyin.com/get_qrcode/?aid=10006&service=https:%2F%2Fwww.douyin.com%2Fpay&t={timestamp}'
+        response = session.get(url, timeout=30)
+        
+        try:
+            data = response.json()
+        except:
+            return jsonify({'error': '获取二维码失败，返回非JSON数据'}), 500
+        
+        if data.get('data'):
+            qrcode_session = session
+            qrcode_token = data['data'].get('token')
+            qrcode_url = data['data'].get('qrcode_index_url')
+            
+            if qrcode_url:
+                qrcode_response = session.get(qrcode_url, timeout=30)
+                qrcode_base64 = base64.b64encode(qrcode_response.content).decode('utf-8')
+                
+                return jsonify({
+                    'success': True,
+                    'qrcode': qrcode_base64,
+                    'token': qrcode_token,
+                    'expire_time': 30,
+                })
+            else:
+                return jsonify({'error': '二维码URL为空'}), 500
+        else:
+            return jsonify({'error': '获取二维码失败'}), 500
+    except Exception as e:
+        app.logger.error(f'获取二维码失败: {str(e)}')
+        return jsonify({'error': f'获取二维码失败: {str(e)}'}), 500
+
+@app.route('/api/douyin/set_cookies', methods=['POST'])
+def set_douyin_cookies():
+    global DOUYIN_COOKIES, LAST_COOKIES_UPDATE
+    try:
+        data = request.get_json() or {}
+        cookies_text = data.get('cookies', '').strip()
+        
+        if not cookies_text:
+            return jsonify({'error': 'Cookie内容不能为空'}), 400
+        
+        with open(app.config['COOKIES_FILE'], 'w', encoding='utf-8') as f:
+            f.write(cookies_text)
+        
+        DOUYIN_COOKIES = {}
+        for cookie in cookies_text.split(';'):
+            cookie = cookie.strip()
+            if '=' in cookie:
+                name, value = cookie.split('=', 1)
+                DOUYIN_COOKIES[name.strip()] = value.strip()
+        
+        LAST_COOKIES_UPDATE = time.time()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cookie已保存',
+            'cookies_count': len(DOUYIN_COOKIES),
+        })
+    except Exception as e:
+        app.logger.error(f'保存Cookie失败: {str(e)}')
+        return jsonify({'error': f'保存Cookie失败: {str(e)}'}), 500
+
+@app.route('/api/douyin/login_status', methods=['GET'])
+def check_login_status():
+    global qrcode_session, qrcode_token
+    try:
+        if not qrcode_session or not qrcode_token:
+            return jsonify({'error': '请先获取二维码'}), 400
+        
+        timestamp = str(int(time.time() * 1000))
+        url = f'https://sso.douyin.com/check_qrconnect/?aid=10006&token={qrcode_token}&service=https:%2F%2Fwww.douyin.com%2Fpay&t={timestamp}'
+        response = qrcode_session.get(url, timeout=30)
+        
+        try:
+            data = response.json()
+        except:
+            return jsonify({'error': '检查状态失败，返回非JSON数据'}), 500
+        
+        if data.get('data'):
+            status = data['data'].get('status')
+            if status == 3:
+                redirect_url = data['data'].get('redirect_url')
+                if redirect_url:
+                    qrcode_session.get(redirect_url, timeout=30)
+                
+                cookies_dict = {}
+                cookie_string = ''
+                for cookie in qrcode_session.cookies:
+                    cookies_dict[cookie.name] = cookie.value
+                    cookie_string += f"{cookie.name}={cookie.value}; "
+                
+                global DOUYIN_COOKIES, LAST_COOKIES_UPDATE
+                DOUYIN_COOKIES = cookies_dict
+                LAST_COOKIES_UPDATE = time.time()
+                
+                with open(app.config['COOKIES_FILE'], 'w', encoding='utf-8') as f:
+                    f.write(cookie_string.strip())
+                
+                return jsonify({
+                    'success': True,
+                    'status': 'success',
+                    'message': '登录成功，Cookie已保存',
+                    'cookies_saved': True,
+                })
+            elif status == 1:
+                return jsonify({'success': True, 'status': 'waiting', 'message': '二维码未失效，请扫码'})
+            elif status == 2:
+                return jsonify({'success': True, 'status': 'scanned', 'message': '已扫码，请确认'})
+            elif status == 5:
+                return jsonify({'success': True, 'status': 'expired', 'message': '二维码已失效，请重新获取'})
+            else:
+                return jsonify({'success': True, 'status': 'unknown', 'message': '未知状态'})
+        else:
+            return jsonify({'error': '检查状态失败'}), 500
+    except Exception as e:
+        app.logger.error(f'检查登录状态失败: {str(e)}')
+        return jsonify({'error': f'检查登录状态失败: {str(e)}'}), 500
+
+@app.route('/api/douyin/cookies_status', methods=['GET'])
+def get_cookies_status():
+    cookies_valid = os.path.exists(app.config['COOKIES_FILE'])
+    if cookies_valid:
+        file_time = os.path.getmtime(app.config['COOKIES_FILE'])
+        age_hours = (time.time() - file_time) / 3600
+        return jsonify({
+            'success': True,
+            'has_cookies': cookies_valid,
+            'age_hours': round(age_hours, 1),
+            'updated': file_time,
+        })
+    return jsonify({'success': True, 'has_cookies': False, 'age_hours': 0, 'updated': 0})
+
+@app.route('/api/douyin/clear_cookies', methods=['POST'])
+def clear_cookies():
+    try:
+        if os.path.exists(app.config['COOKIES_FILE']):
+            os.remove(app.config['COOKIES_FILE'])
+            global DOUYIN_COOKIES, LAST_COOKIES_UPDATE
+            DOUYIN_COOKIES = {}
+            LAST_COOKIES_UPDATE = 0
+            return jsonify({'success': True, 'message': 'Cookie已清除'})
+        return jsonify({'success': True, 'message': '没有Cookie可清除'})
+    except Exception as e:
+        return jsonify({'error': f'清除Cookie失败: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=app.config['PORT'], debug=False)

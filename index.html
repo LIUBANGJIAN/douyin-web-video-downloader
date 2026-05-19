@@ -28,6 +28,7 @@
         .badge.available { background: #28a745; }
         .badge.unavailable { background: #dc3545; }
         .badge.version { background: rgba(255,255,255,.25); }
+        .badge.cookies { background: #ff9800; }
         .card {
             background: #fff;
             border-radius: 20px;
@@ -80,6 +81,24 @@
             cursor: pointer;
             display: none;
         }
+        .btn-qrcode {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #ff9800, #ff5722);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-qrcode:hover { opacity: 0.9; }
+        .btn-qrcode:disabled { opacity: 0.6; }
         .quality-group { display: none; margin-bottom: 16px; }
         .quality-group.show { display: block; }
         select {
@@ -144,6 +163,99 @@
             margin-right: 6px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+        }
+        .modal h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .qrcode-container {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 20px;
+            background: #fff;
+            border-radius: 12px;
+            border: 2px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .qrcode-container img {
+            width: 180px;
+            height: 180px;
+            object-fit: contain;
+        }
+        .qrcode-container .loading {
+            border-color: #667eea;
+            border-top-color: transparent;
+            width: 40px;
+            height: 40px;
+        }
+        .status-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 16px;
+            min-height: 20px;
+        }
+        .status-text.scanned { color: #ff9800; }
+        .status-text.success { color: #28a745; }
+        .status-text.error { color: #dc3545; }
+        .modal .btn-close {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            background: #f0f0f0;
+            color: #666;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .modal .btn-close:hover { background: #e0e0e0; }
+        .modal .btn-refresh {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: #fff;
+            cursor: pointer;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+        .btn-switch {
+            padding: 8px 16px;
+            border: 1px solid #667eea;
+            border-radius: 8px;
+            background: transparent;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-switch:hover {
+            background: #f0f0ff;
+        }
+        .cookie-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -152,9 +264,10 @@
             <div class="icon">📥</div>
             <h1>视频下载器</h1>
             <div class="status-bar">
-                <span class="badge version" id="version">v2.0.3</span>
+                <span class="badge version" id="version">v2.0.5</span>
                 <span class="badge" id="nodeStatus">🔄 检测中...</span>
                 <span class="badge" id="ytdlpStatus">🔄 检测中...</span>
+                <span class="badge cookies" id="cookiesStatus">🍪 Cookie</span>
             </div>
         </div>
 
@@ -165,6 +278,11 @@
                 <button type="button" onclick="pasteUrl()">粘贴</button>
                 <button type="button" onclick="clearAll()">清空</button>
             </div>
+
+            <button class="btn-qrcode" id="qrcodeBtn" onclick="showQrcodeModal()">
+                <span>📱</span>
+                <span id="qrcodeBtnText">扫码获取抖音Cookie</span>
+            </button>
 
             <div class="quality-group" id="qualityGroup">
                 <label for="quality">画质</label>
@@ -186,7 +304,31 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="qrcodeModal">
+        <div class="modal">
+            <h3>抖音Cookie设置</h3>
+            <div id="modalContent">
+                <div class="qrcode-container" id="qrcodeContainer">
+                    <span class="loading"></span>
+                </div>
+                <div class="status-text" id="loginStatus">获取二维码中...</div>
+                <button class="btn-refresh" id="refreshBtn" style="display:none" onclick="refreshQrcode()">刷新二维码</button>
+            </div>
+            <div id="cookieInputPanel" style="display:none">
+                <label style="text-align:left;display:block;margin-bottom:8px;color:#666;font-size:14px">Cookie内容</label>
+                <textarea id="cookieInput" rows="4" placeholder="请粘贴抖音Cookie（格式：key1=value1; key2=value2; ...）" style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;font-family:monospace"></textarea>
+                <button class="btn-primary" style="margin-top:12px;padding:12px" onclick="submitCookie()">保存Cookie</button>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee">
+                <button class="btn-switch" onclick="switchMode()" id="modeSwitch">切换到手动输入Cookie</button>
+            </div>
+            <button class="btn-close" onclick="closeQrcodeModal()">关闭</button>
+        </div>
+    </div>
+
     <script>
+        let loginPolling = null;
+
         function showResult(html, type) {
             const box = document.getElementById('result');
             document.getElementById('resultBody').innerHTML = html;
@@ -309,7 +451,7 @@
             try {
                 const r = await fetch('/api/version');
                 const d = await r.json();
-                document.getElementById('version').textContent = d.version || 'v2.0.3';
+                document.getElementById('version').textContent = d.version || 'v2.0.4';
 
                 const nodeEl = document.getElementById('nodeStatus');
                 if (d.node_available) {
@@ -328,14 +470,185 @@
                     ytdlpEl.textContent = '❌ yt-dlp 未知';
                     ytdlpEl.className = 'badge unavailable';
                 }
+
+                await updateCookiesStatus();
             } catch (e) {
                 document.getElementById('nodeStatus').textContent = '❌ 检测失败';
                 document.getElementById('ytdlpStatus').textContent = '❌ 检测失败';
             }
         }
 
+        async function updateCookiesStatus() {
+            try {
+                const r = await fetch('/api/douyin/cookies_status');
+                const d = await r.json();
+                const el = document.getElementById('cookiesStatus');
+                if (d.has_cookies) {
+                    if (d.age_hours < 1) {
+                        el.textContent = '🍪 Cookie 已更新';
+                    } else if (d.age_hours < 24) {
+                        el.textContent = '🍪 Cookie (' + d.age_hours + '小时前)';
+                    } else {
+                        el.textContent = '🍪 Cookie 过期';
+                        el.className = 'badge cookies unavailable';
+                        return;
+                    }
+                    el.className = 'badge cookies available';
+                } else {
+                    el.textContent = '🍪 无Cookie';
+                    el.className = 'badge cookies';
+                }
+            } catch (e) {
+                console.error('更新Cookie状态失败:', e);
+            }
+        }
+
+        function showQrcodeModal() {
+            document.getElementById('qrcodeModal').classList.add('show');
+            document.getElementById('refreshBtn').style.display = 'none';
+            fetchQrcode();
+        }
+
+        function closeQrcodeModal() {
+            document.getElementById('qrcodeModal').classList.remove('show');
+            stopPolling();
+        }
+
+        async function fetchQrcode() {
+            const container = document.getElementById('qrcodeContainer');
+            const status = document.getElementById('loginStatus');
+            
+            try {
+                container.innerHTML = '<span class="loading"></span>';
+                status.textContent = '获取二维码中...';
+                status.className = 'status-text';
+
+                const r = await fetch('/api/douyin/qrcode');
+                const d = await r.json();
+                
+                if (d.success && d.qrcode) {
+                    container.innerHTML = '<img src="data:image/png;base64,' + d.qrcode + '" />';
+                    status.textContent = '请使用抖音扫码登录';
+                    startPolling();
+                } else {
+                    status.textContent = '获取二维码失败: ' + (d.error || '未知错误');
+                    status.className = 'status-text error';
+                    document.getElementById('refreshBtn').style.display = 'block';
+                }
+            } catch (e) {
+                status.textContent = '网络错误: ' + e.message;
+                status.className = 'status-text error';
+                document.getElementById('refreshBtn').style.display = 'block';
+            }
+        }
+
+        function refreshQrcode() {
+            stopPolling();
+            fetchQrcode();
+        }
+
+        function startPolling() {
+            stopPolling();
+            loginPolling = setInterval(async () => {
+                try {
+                    const r = await fetch('/api/douyin/login_status');
+                    const d = await r.json();
+                    
+                    if (d.success) {
+                        const status = document.getElementById('loginStatus');
+                        
+                        if (d.status === 'waiting') {
+                            status.textContent = '请使用抖音扫码登录';
+                            status.className = 'status-text';
+                        } else if (d.status === 'scanned') {
+                            status.textContent = '已扫码，请在抖音确认登录';
+                            status.className = 'status-text scanned';
+                        } else if (d.status === 'success') {
+                            status.textContent = '登录成功！Cookie已保存';
+                            status.className = 'status-text success';
+                            stopPolling();
+                            document.getElementById('refreshBtn').style.display = 'none';
+                            await updateCookiesStatus();
+                            setTimeout(() => {
+                                closeQrcodeModal();
+                                showResult('<p>✅ Cookie已成功获取，可以下载抖音视频了</p>', 'ok');
+                            }, 1500);
+                        } else if (d.status === 'expired') {
+                            status.textContent = '二维码已失效，请刷新';
+                            status.className = 'status-text error';
+                            stopPolling();
+                            document.getElementById('refreshBtn').style.display = 'block';
+                        }
+                    }
+                } catch (e) {
+                    console.error('轮询失败:', e);
+                }
+            }, 2000);
+        }
+
+        function stopPolling() {
+            if (loginPolling) {
+                clearInterval(loginPolling);
+                loginPolling = null;
+            }
+        }
+
+        let isQrcodeMode = true;
+
+        function switchMode() {
+            stopPolling();
+            const contentPanel = document.getElementById('modalContent');
+            const inputPanel = document.getElementById('cookieInputPanel');
+            const switchBtn = document.getElementById('modeSwitch');
+            
+            if (isQrcodeMode) {
+                contentPanel.style.display = 'none';
+                inputPanel.style.display = 'block';
+                switchBtn.textContent = '切换到扫码登录';
+            } else {
+                inputPanel.style.display = 'none';
+                contentPanel.style.display = 'block';
+                switchBtn.textContent = '切换到手动输入Cookie';
+                fetchQrcode();
+            }
+            isQrcodeMode = !isQrcodeMode;
+        }
+
+        async function submitCookie() {
+            const cookieText = document.getElementById('cookieInput').value.trim();
+            if (!cookieText) {
+                alert('请输入Cookie内容');
+                return;
+            }
+            
+            try {
+                const r = await fetch('/api/douyin/set_cookies', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cookies: cookieText })
+                });
+                const d = await r.json();
+                
+                if (d.success) {
+                    showResult('<p>✅ Cookie已成功保存，可以下载抖音视频了</p>', 'ok');
+                    await updateCookiesStatus();
+                    closeQrcodeModal();
+                } else {
+                    alert('保存失败: ' + (d.error || '未知错误'));
+                }
+            } catch (e) {
+                alert('保存失败: ' + e.message);
+            }
+        }
+
         document.getElementById('url').addEventListener('keypress', e => {
             if (e.key === 'Enter') parseVideo();
+        });
+
+        document.getElementById('qrcodeModal').addEventListener('click', e => {
+            if (e.target === document.getElementById('qrcodeModal')) {
+                closeQrcodeModal();
+            }
         });
 
         initApp();
