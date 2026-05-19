@@ -7,7 +7,7 @@ import douyin_client
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.0.1'
+APP_VERSION = 'v2.0.2'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
@@ -45,6 +45,7 @@ def cookie_check():
 
 @app.route('/api/cookie/qrcode', methods=['POST'])
 def cookie_qrcode():
+    print('[app] /api/cookie/qrcode called')
     return jsonify(cookie_manager.start_qr_login())
 
 

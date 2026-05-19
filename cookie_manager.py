@@ -253,27 +253,34 @@ def _run_qr_login():
             )
             page = context.new_page()
             try:
-                page.goto('https://www.douyin.com/login', wait_until='domcontentloaded', timeout=60000)
-                print('[cookie_manager] navigated to login page', page.url)
+                page.goto('https://www.douyin.com/', wait_until='networkidle', timeout=120000)
+                print('[cookie_manager] navigated to homepage', page.url)
+                page.wait_for_timeout(5000)
             except Exception as e:
-                print('[cookie_manager] login page navigation failed:', e)
-                page.goto('https://www.douyin.com/', wait_until='domcontentloaded', timeout=60000)
-                print('[cookie_manager] fallback to homepage', page.url)
+                print('[cookie_manager] homepage navigation failed:', e)
+                try:
+                    page.goto('https://www.douyin.com/login', wait_until='networkidle', timeout=120000)
+                    print('[cookie_manager] fallback navigated to login page', page.url)
+                except Exception as e2:
+                    print('[cookie_manager] login page navigation failed:', e2)
             time.sleep(5)
 
             clicked = False
-            for text in ('登录', '扫码登录', 'QR Code', '二维码'):
+            for text in ('扫码登录', '登录', '登录抖音', '登录/注册', 'QR Code', '扫码登录抖音', '二维码'):
                 try:
                     locator = page.get_by_text(text, exact=False)
                     if locator.count() > 0:
-                        locator.first.click(timeout=3000)
-                        time.sleep(2)
+                        locator.first.click(timeout=5000)
+                        page.wait_for_timeout(5000)
                         clicked = True
                         print(f'[cookie_manager] clicked login text: {text}')
                         break
                 except Exception as e:
                     print(f'[cookie_manager] click text "{text}" failed: {e}')
                     continue
+
+            if not clicked:
+                print('[cookie_manager] did not click login button, continuing to screenshot')
 
             if not clicked:
                 print('[cookie_manager] did not click login button, continuing to screenshot')
@@ -370,6 +377,7 @@ def _run_qr_login():
 def start_qr_login():
     global _login_thread, _status, _qr_base64, _message
     with _lock:
+        print(f'[cookie_manager] start_qr_login called, status={_status}, thread_alive={_login_thread.is_alive() if _login_thread else False}')
         if _status == 'scanning':
             return get_status()
         if _login_thread and _login_thread.is_alive():
