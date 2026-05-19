@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, redirect
 import re
 import os
 import uuid
@@ -6,7 +6,7 @@ import requests
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.4.5'
+APP_VERSION = 'v2.4.6'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
@@ -407,6 +407,64 @@ def serve_file(filename):
     if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True)
     return jsonify({'error': '文件不存在'}), 404
+
+@app.route('/api/direct-download')
+def direct_download():
+    """直接下载API - 用于iOS快捷指令等外部调用"""
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'error': '缺少URL参数', 'code': 400}), 400
+    
+    # 解析抖音链接
+    info = _parse_douyin_url(url)
+    if not info:
+        return jsonify({'error': '解析失败', 'code': 500}), 500
+    
+    try:
+        if info.get('type') == 'video':
+            video_url = info['video_url']
+            # 直接重定向到视频URL（iOS快捷指令可以直接下载）
+            return redirect(video_url)
+        else:
+            img_list = info.get('image_url_list', [])
+            if img_list:
+                # 返回第一张图片
+                return redirect(img_list[0])
+            return jsonify({'error': '未找到图片', 'code': 500}), 500
+            
+    except Exception as e:
+        app.logger.error(f"直接下载失败: {str(e)}")
+        return jsonify({'error': '下载失败', 'code': 500}), 500
+
+@app.route('/api/quick-download')
+def quick_download():
+    """快速下载API - 返回JSON格式的下载链接，便于快捷指令处理多图"""
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'error': '缺少URL参数', 'code': 400}), 400
+    
+    info = _parse_douyin_url(url)
+    if not info:
+        return jsonify({'error': '解析失败', 'code': 500}), 500
+    
+    if info.get('type') == 'video':
+        return jsonify({
+            'success': True,
+            'type': 'video',
+            'title': info.get('title', ''),
+            'author': info.get('author', ''),
+            'download_url': info['video_url'],
+            'thumbnail': info.get('thumbnail', ''),
+        })
+    else:
+        return jsonify({
+            'success': True,
+            'type': 'image',
+            'title': info.get('title', ''),
+            'author': info.get('author', ''),
+            'download_urls': info.get('image_url_list', []),
+            'thumbnail': info.get('thumbnail', ''),
+        })
 
 if __name__ == '__main__':
     port = app.config['PORT']

@@ -154,7 +154,7 @@
             <div class="icon">📥</div>
             <h1>抖音视频下载器</h1>
             <div class="status-bar">
-                <span class="badge version" id="version">v2.4.5</span>
+                <span class="badge version" id="version">v2.4.6</span>
                 <span class="badge" id="backend">douyinVd</span>
             </div>
         </div>
@@ -301,7 +301,12 @@
                 const d = await r.json();
                 if (d.success) {
                     const mb = (d.fileSize / 1024 / 1024).toFixed(2);
+                    // 获取当前内容，但移除之前的保存按钮和大小信息
                     let html = document.getElementById('resultBody').innerHTML;
+                    // 移除之前添加的下载相关内容
+                    html = html.replace(/<p style="margin-top:10px">.*?<\/p>/g, '');
+                    html = html.replace(/<a class="btn-dl"[^>]*>.*?<\/a>/g, '');
+                    
                     if (d.imageCount && d.imageCount > 1) {
                         html += '<p style="margin-top:10px">共 ' + d.imageCount + ' 张图片</p>';
                     }
