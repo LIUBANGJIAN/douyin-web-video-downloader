@@ -252,7 +252,7 @@
             <div class="icon">📥</div>
             <h1>视频下载器</h1>
             <div class="status-bar">
-                <span class="badge version" id="version">v2.3.0</span>
+                <span class="badge version" id="version">v2.3.1</span>
                 <span class="badge" id="nodeStatus">🔄 检测中...</span>
                 <span class="badge" id="ytdlpStatus">🔄 检测中...</span>
                 <span class="badge cookies" id="cookiesStatus">🍪 Cookie</span>
@@ -430,7 +430,7 @@
             try {
                 const r = await fetch('/api/version');
                 const d = await r.json();
-                document.getElementById('version').textContent = d.version || 'v2.3.0';
+                document.getElementById('version').textContent = d.version || 'v2.3.1';
 
                 const nodeEl = document.getElementById('nodeStatus');
                 if (d.node_available) {
