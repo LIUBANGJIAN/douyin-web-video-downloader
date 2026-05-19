@@ -47,6 +47,36 @@ def _request_douyin_api(path, params=None):
         f' 尝试地址: {", ".join(_get_api_urls())}; 错误: {" | ".join(errors)}'
     )
 
+
+def _post_douyin_api(path, json_data=None):
+    errors = []
+    for base_url in _get_api_urls():
+        url = f'{base_url}{path}'
+        try:
+            resp = requests.post(url, json=json_data, timeout=30)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.RequestException as exc:
+            errors.append(f'{base_url}: {exc}')
+            if DOUYIN_API_URL:
+                break
+
+    raise RuntimeError(
+        '后端更新 Cookie 失败，请检查 DOUYIN_API_URL 或后端服务是否已启动。'
+        f' 尝试地址: {", ".join(_get_api_urls())}; 错误: {" | ".join(errors)}'
+    )
+
+
+def _sync_cookie_to_backend(cookie_header):
+    body = _post_douyin_api(
+        '/api/hybrid/update_cookie',
+        json_data={'service': 'douyin', 'cookie': cookie_header},
+    )
+    code = body.get('code', body.get('status_code', 0))
+    if code not in (200, '200', 0):
+        raise RuntimeError(body.get('message') or body.get('msg') or f'API 错误: {code}')
+    return True
+
 _lock = threading.Lock()
 _status = 'checking'  # checking | valid | invalid | scanning
 _qr_base64 = ''
@@ -56,6 +86,51 @@ _login_thread = None
 
 def _ensure_config_dir():
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+
+
+def _load_config():
+    if not os.path.isfile(CONFIG_PATH):
+        return {}
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def _save_config(config_data):
+    _ensure_config_dir()
+    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+        yaml.safe_dump(config_data, f, allow_unicode=True, sort_keys=False)
+
+
+def _load_template_config():
+    template_path = os.path.join(os.path.dirname(__file__), 'douyin_config_template.yaml')
+    if not os.path.isfile(template_path):
+        return {}
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def _get_cookie_header_from_config(config_data):
+    if not isinstance(config_data, dict):
+        return ''
+    cookie = config_data.get('Cookie')
+    if cookie:
+        return str(cookie).strip()
+    token_manager = config_data.get('TokenManager', {})
+    if not isinstance(token_manager, dict):
+        return ''
+    douyin_config = token_manager.get('douyin', {})
+    if not isinstance(douyin_config, dict):
+        return ''
+    headers = douyin_config.get('headers', {})
+    if not isinstance(headers, dict):
+        return ''
+    return str(headers.get('Cookie') or '').strip()
 
 
 def _cookies_to_header(cookies):
@@ -72,20 +147,35 @@ def _cookies_to_header(cookies):
 
 
 def _write_config(cookie_header):
-    _ensure_config_dir()
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        f.write(f'Cookie: {cookie_header}\n')
+    config_data = _load_config()
+    template = _load_template_config()
+
+    if not isinstance(config_data.get('TokenManager'), dict):
+        config_data = template if isinstance(template, dict) else {}
+
+    token_manager = config_data.setdefault('TokenManager', {})
+    if not isinstance(token_manager, dict):
+        token_manager = {}
+        config_data['TokenManager'] = token_manager
+
+    douyin_config = token_manager.setdefault('douyin', {})
+    if not isinstance(douyin_config, dict):
+        douyin_config = {}
+        token_manager['douyin'] = douyin_config
+
+    headers = douyin_config.setdefault('headers', {})
+    if not isinstance(headers, dict):
+        headers = {}
+        douyin_config['headers'] = headers
+
+    headers['Cookie'] = cookie_header
+    config_data.pop('Cookie', None)
+    _save_config(config_data)
 
 
 def _read_cookie_header():
-    if not os.path.isfile(CONFIG_PATH):
-        return ''
-    try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f) or {}
-        return (data.get('Cookie') or '').strip()
-    except Exception:
-        return ''
+    config_data = _load_config()
+    return _get_cookie_header_from_config(config_data)
 
 
 def _test_cookie_with_api():
@@ -217,7 +307,16 @@ def _run_qr_login():
                     header = _cookies_to_header(cookies)
                     if len(header) > 50:
                         _write_config(header)
-                        logged_in = True
+                        try:
+                            _sync_cookie_to_backend(header)
+                            logged_in = True
+                        except Exception as sync_exc:
+                            with _lock:
+                                _status = 'invalid'
+                                _qr_base64 = ''
+                                _message = f'登录成功，Cookie 已保存，但无法同步到后端：{sync_exc}'
+                            browser.close()
+                            return
                         break
                 time.sleep(1)
 
