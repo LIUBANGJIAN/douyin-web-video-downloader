@@ -10,10 +10,11 @@ import time
 import threading
 import base64
 import json
+import tempfile
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.1.0'
+APP_VERSION = 'v2.2.0'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 app.config['COOKIES_FILE'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
@@ -302,24 +303,34 @@ def serve_download(filename):
         return jsonify({'error': '文件不存在'}), 404
     return send_file(path, as_attachment=True)
 
-login_thread = None
-login_result = None
+login_context = None
+login_qrcode_base64 = None
 login_status = 'idle'
+login_result = None
+login_thread = None
 
-def do_browser_login():
-    global login_result, login_status
+def do_qrcode_login():
+    global login_status, login_result, login_qrcode_base64
+    
     from playwright.sync_api import sync_playwright
     
     try:
         login_status = 'starting'
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, args=['--no-sandbox', '--disable-setuid-sandbox'])
-            context = browser.new_context(viewport={'width': 1280, 'height': 720})
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'])
+            context = browser.new_context(
+                viewport={'width': 1280, 'height': 720},
+                user_agent=USER_AGENT
+            )
             page = context.new_page()
             
             login_status = 'navigating'
             page.goto('https://www.douyin.com', timeout=60000)
             page.wait_for_timeout(3000)
+            
+            login_status = 'capturing'
+            screenshot = page.screenshot()
+            login_qrcode_base64 = base64.b64encode(screenshot).decode('utf-8')
             
             login_status = 'waiting'
             start_time = time.time()
@@ -355,6 +366,8 @@ def do_browser_login():
                     break
                 
                 page.wait_for_timeout(2000)
+                screenshot = page.screenshot()
+                login_qrcode_base64 = base64.b64encode(screenshot).decode('utf-8')
             else:
                 login_status = 'timeout'
                 login_result = {'success': False, 'message': '登录超时，请重新尝试'}
@@ -366,78 +379,57 @@ def do_browser_login():
 
 @app.route('/api/douyin/qrcode', methods=['GET'])
 def get_douyin_qrcode():
-    global login_thread, login_result, login_status
+    global login_thread, login_result, login_status, login_qrcode_base64
     
     if not PLAYWRIGHT_AVAILABLE:
         return jsonify({'error': 'Playwright 未安装，请先安装: pip install playwright && playwright install chromium'}), 500
     
     if login_thread and login_thread.is_alive():
-        return jsonify({'error': '已有登录会话进行中，请等待完成'}), 400
+        return jsonify({
+            'success': True,
+            'status': login_status,
+            'qrcode': login_qrcode_base64,
+        })
     
     login_result = None
+    login_qrcode_base64 = None
     login_status = 'idle'
     
-    login_thread = threading.Thread(target=do_browser_login)
+    login_thread = threading.Thread(target=do_qrcode_login)
     login_thread.daemon = True
     login_thread.start()
     
+    time.sleep(3)
+    
     return jsonify({
         'success': True,
-        'message': '浏览器已启动，请在弹出的浏览器窗口中完成抖音登录',
-        'status': 'starting',
+        'status': login_status,
+        'qrcode': login_qrcode_base64,
+        'message': login_status == 'waiting' and '请使用抖音扫码登录' or '正在准备登录二维码...',
     })
 
 @app.route('/api/douyin/login_status', methods=['GET'])
 def check_login_status():
-    global login_status, login_result, login_thread
+    global login_status, login_result, login_thread, login_qrcode_base64
     
     if login_thread and login_thread.is_alive():
         return jsonify({
             'success': True,
             'status': login_status,
+            'qrcode': login_qrcode_base64,
             'message': {
                 'idle': '等待开始',
                 'starting': '正在启动浏览器...',
                 'navigating': '正在打开抖音页面...',
-                'waiting': '等待用户登录（请在弹出的浏览器中扫码或登录）...',
+                'capturing': '正在捕获二维码...',
+                'waiting': '等待用户扫码登录...',
             }.get(login_status, '未知状态'),
         })
     
     if login_result:
         return jsonify(login_result)
     
-    return jsonify({'success': True, 'status': 'idle', 'message': '未开始登录'})
-
-@app.route('/api/douyin/set_cookies', methods=['POST'])
-def set_douyin_cookies():
-    global DOUYIN_COOKIES, LAST_COOKIES_UPDATE
-    try:
-        data = request.get_json() or {}
-        cookies_text = data.get('cookies', '').strip()
-        
-        if not cookies_text:
-            return jsonify({'error': 'Cookie内容不能为空'}), 400
-        
-        with open(app.config['COOKIES_FILE'], 'w', encoding='utf-8') as f:
-            f.write(cookies_text)
-        
-        DOUYIN_COOKIES = {}
-        for cookie in cookies_text.split(';'):
-            cookie = cookie.strip()
-            if '=' in cookie:
-                name, value = cookie.split('=', 1)
-                DOUYIN_COOKIES[name.strip()] = value.strip()
-        
-        LAST_COOKIES_UPDATE = time.time()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Cookie已保存',
-            'cookies_count': len(DOUYIN_COOKIES),
-        })
-    except Exception as e:
-        app.logger.error(f'保存Cookie失败: {str(e)}')
-        return jsonify({'error': f'保存Cookie失败: {str(e)}'}), 500
+    return jsonify({'success': True, 'status': 'idle', 'message': '未开始登录', 'qrcode': None})
 
 @app.route('/api/douyin/cookies_status', methods=['GET'])
 def get_cookies_status():
