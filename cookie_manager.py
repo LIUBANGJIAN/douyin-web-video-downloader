@@ -136,8 +136,8 @@ def _get_cookie_header_from_config(config_data):
 def _cookies_to_header(cookies):
     parts = []
     for c in cookies:
-        domain = c.get('domain', '')
-        if 'douyin' not in domain and domain not in ('', '.douyin.com'):
+        domain = c.get('domain', '') or ''
+        if domain and not any(k in domain for k in ('douyin.com', 'ixigua.com', 'snssdk.com', 'byteimg.com', 'tiktok.com', 'bytedance.com')):
             continue
         name = c.get('name', '')
         value = c.get('value', '')
@@ -169,7 +169,7 @@ def _write_config(cookie_header):
         douyin_config['headers'] = headers
 
     headers['Cookie'] = cookie_header
-    config_data.pop('Cookie', None)
+    config_data['Cookie'] = cookie_header
     _save_config(config_data)
 
 
@@ -278,19 +278,21 @@ def _run_qr_login():
             if not clicked:
                 print('[cookie_manager] did not click login button, continuing to screenshot')
 
-            time.sleep(3)
+            time.sleep(5)
             png = None
             selectors = [
                 'img[src*="qr"]',
+                'img[src*="qrcode"]',
                 '.login-qrcode img',
                 'div[class*="qrcode"] img',
+                '.qr-code img',
+                '.qrcode img',
                 'canvas',
-                'img[src*="qrcode"]',
                 'svg',
             ]
             for sel in selectors:
                 try:
-                    el = page.wait_for_selector(sel, timeout=5000)
+                    el = page.wait_for_selector(sel, timeout=10000)
                     if el:
                         png = el.screenshot(type='png')
                         print(f'[cookie_manager] captured qr through selector: {sel}')
@@ -298,6 +300,20 @@ def _run_qr_login():
                 except Exception as e:
                     print(f'[cookie_manager] selector {sel} failed: {e}')
                     continue
+
+            if not png:
+                print('[cookie_manager] no qr selector matched, trying iframe fallback')
+                frames = page.frames
+                for frame in frames:
+                    try:
+                        el = frame.query_selector('img[src*="qr"], img[src*="qrcode"], .qrcode, .login-qrcode')
+                        if el:
+                            png = el.screenshot(type='png')
+                            print('[cookie_manager] captured qr from iframe frame')
+                            break
+                    except Exception as e:
+                        print('[cookie_manager] iframe selector failed:', e)
+                        continue
 
             if not png:
                 print('[cookie_manager] no qr selector matched, trying fallback screenshot')

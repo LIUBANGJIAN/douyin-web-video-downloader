@@ -48,8 +48,18 @@ def _api_get(path, params=None):
         try:
             resp = requests.get(url, params=params, timeout=90)
             resp.raise_for_status()
-            return resp.json()
+            try:
+                body = resp.json()
+            except ValueError as exc:
+                raise RuntimeError(f'解析服务返回非法 JSON: {exc}') from exc
+            if body is None:
+                raise RuntimeError('解析服务返回空响应')
+            return body
         except requests.exceptions.RequestException as exc:
+            errors.append(f'{base_url}: {exc}')
+            if DOUYIN_API_URL:
+                break
+        except RuntimeError as exc:
             errors.append(f'{base_url}: {exc}')
             if DOUYIN_API_URL:
                 break
@@ -65,6 +75,8 @@ def fetch_hybrid(url, minimal=False):
         'url': url,
         'minimal': 'true' if minimal else 'false',
     })
+    if not isinstance(body, dict):
+        raise RuntimeError('解析服务返回非法响应类型')
     code = body.get('code', body.get('status_code'))
     if code not in (200, '200', 0, None):
         raise RuntimeError(body.get('message') or body.get('msg') or f'API 错误: {code}')
