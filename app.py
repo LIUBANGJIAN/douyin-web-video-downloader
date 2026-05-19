@@ -317,16 +317,32 @@ def do_qrcode_login():
     try:
         login_status = 'starting'
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'])
+            browser = p.chromium.launch(headless=False, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--window-size=800,600'])
             context = browser.new_context(
-                viewport={'width': 1280, 'height': 720},
+                viewport={'width': 800, 'height': 600},
                 user_agent=USER_AGENT
             )
             page = context.new_page()
             
             login_status = 'navigating'
             page.goto('https://www.douyin.com', timeout=60000)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(2000)
+            
+            login_status = 'finding_login'
+            try:
+                login_buttons = page.locator('button:has-text("登录")').all()
+                if login_buttons:
+                    login_buttons[0].click()
+                    page.wait_for_timeout(2000)
+                else:
+                    login_buttons = page.locator('a:has-text("登录")').all()
+                    if login_buttons:
+                        login_buttons[0].click()
+                        page.wait_for_timeout(2000)
+            except Exception as e:
+                app.logger.info(f"未找到登录按钮，可能已在登录页面: {str(e)}")
+            
+            page.wait_for_timeout(2000)
             
             login_status = 'capturing'
             screenshot = page.screenshot()
@@ -334,7 +350,7 @@ def do_qrcode_login():
             
             login_status = 'waiting'
             start_time = time.time()
-            while time.time() - start_time < 120:
+            while time.time() - start_time < 180:
                 cookies = context.cookies()
                 ttwid = None
                 passport_csrf_token = None
