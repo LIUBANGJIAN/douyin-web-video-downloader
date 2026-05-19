@@ -6,7 +6,7 @@ import requests
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.4.4'
+APP_VERSION = 'v2.4.5'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
@@ -264,6 +264,31 @@ def version():
         'backend': 'douyinVd',
         'playwright': False,
     })
+
+@app.route('/api/proxy')
+def proxy_image():
+    """代理图片请求，解决跨域问题"""
+    url = request.args.get('url')
+    if not url:
+        return jsonify({'error': '缺少URL参数'}), 400
+    
+    try:
+        headers = {
+            'User-Agent': MOBILE_UA,
+            'Referer': 'https://www.douyin.com/',
+        }
+        
+        response = requests.get(url, headers=headers, stream=True, timeout=15)
+        
+        # 获取Content-Type
+        content_type = response.headers.get('Content-Type', 'image/jpeg')
+        
+        # 返回图片内容
+        return response.content, 200, {'Content-Type': content_type}
+    
+    except Exception as e:
+        app.logger.error(f"代理图片失败: {str(e)}")
+        return jsonify({'error': '代理失败'}), 500
 
 @app.route('/api/info', methods=['POST'])
 def video_info():

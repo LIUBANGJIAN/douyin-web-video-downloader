@@ -154,7 +154,7 @@
             <div class="icon">📥</div>
             <h1>抖音视频下载器</h1>
             <div class="status-bar">
-                <span class="badge version" id="version">v2.4.4</span>
+                <span class="badge version" id="version">v2.4.5</span>
                 <span class="badge" id="backend">douyinVd</span>
             </div>
         </div>
@@ -193,10 +193,26 @@
         }
 
         async function pasteUrl() {
+            const input = document.getElementById('url');
             try {
-                document.getElementById('url').value = await navigator.clipboard.readText();
+                // 尝试使用现代剪贴板API
+                const text = await navigator.clipboard.readText();
+                input.value = text;
+                input.focus();
             } catch (e) {
-                document.getElementById('url').focus();
+                // 备用方案：尝试使用execCommand（已弃用但仍支持）
+                try {
+                    input.focus();
+                    if (document.execCommand('paste')) {
+                        // 粘贴成功
+                    } else {
+                        alert('请使用快捷键 Ctrl+V 粘贴');
+                        input.focus();
+                    }
+                } catch (e2) {
+                    alert('请使用快捷键 Ctrl+V 粘贴');
+                    input.focus();
+                }
             }
         }
 
@@ -230,7 +246,13 @@
                     
                     let thumbHtml = '<div class="placeholder">📹</div>';
                     if (d.thumbnail && d.thumbnail.startsWith('http')) {
-                        thumbHtml = '<img src="' + d.thumbnail + '" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
+                        // 使用代理URL处理跨域问题
+                        let thumbUrl = d.thumbnail;
+                        // 如果是抖音图片域名，使用代理
+                        if (thumbUrl.includes('douyinpic.com') || thumbUrl.includes('iesdouyin.com')) {
+                            thumbUrl = '/api/proxy?url=' + encodeURIComponent(d.thumbnail);
+                        }
+                        thumbHtml = '<img src="' + thumbUrl + '" alt="缩略图" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />' +
                                     '<div class="placeholder" style="display:none">📹</div>';
                     }
                     
