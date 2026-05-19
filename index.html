@@ -264,7 +264,7 @@
             <div class="icon">📥</div>
             <h1>视频下载器</h1>
             <div class="status-bar">
-                <span class="badge version" id="version">v2.0.5</span>
+                <span class="badge version" id="version">v2.1.0</span>
                 <span class="badge" id="nodeStatus">🔄 检测中...</span>
                 <span class="badge" id="ytdlpStatus">🔄 检测中...</span>
                 <span class="badge cookies" id="cookiesStatus">🍪 Cookie</span>
@@ -520,22 +520,24 @@
             
             try {
                 container.innerHTML = '<span class="loading"></span>';
-                status.textContent = '获取二维码中...';
+                status.textContent = '正在启动浏览器...';
                 status.className = 'status-text';
 
                 const r = await fetch('/api/douyin/qrcode');
                 const d = await r.json();
                 
-                if (d.success && d.qrcode) {
-                    container.innerHTML = '<img src="data:image/png;base64,' + d.qrcode + '" />';
-                    status.textContent = '请使用抖音扫码登录';
+                if (d.success) {
+                    container.innerHTML = '<span style="font-size:64px">🌐</span>';
+                    status.textContent = d.message || '浏览器已启动，请在弹出窗口中登录抖音';
                     startPolling();
                 } else {
-                    status.textContent = '获取二维码失败: ' + (d.error || '未知错误');
+                    container.innerHTML = '<span style="font-size:64px">❌</span>';
+                    status.textContent = '登录失败: ' + (d.error || '未知错误');
                     status.className = 'status-text error';
                     document.getElementById('refreshBtn').style.display = 'block';
                 }
             } catch (e) {
+                container.innerHTML = '<span style="font-size:64px">❌</span>';
                 status.textContent = '网络错误: ' + e.message;
                 status.className = 'status-text error';
                 document.getElementById('refreshBtn').style.display = 'block';
