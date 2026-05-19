@@ -162,13 +162,25 @@ def _run_qr_login():
             page.goto('https://www.douyin.com/', wait_until='domcontentloaded', timeout=60000)
             time.sleep(3)
 
+            # 尝试打开登录/扫码登录弹窗，如果页面结构发生变化则直接尝试登录链接
+            clicked = False
             for text in ('登录', '扫码登录'):
                 try:
-                    page.get_by_text(text, exact=False).first.click(timeout=3000)
-                    time.sleep(1)
-                    break
+                    locator = page.get_by_text(text, exact=False)
+                    if locator.count() > 0:
+                        locator.first.click(timeout=3000)
+                        time.sleep(1)
+                        clicked = True
+                        break
                 except Exception:
                     continue
+
+            if not clicked:
+                try:
+                    page.goto('https://www.douyin.com/login', wait_until='domcontentloaded', timeout=60000)
+                    time.sleep(3)
+                except Exception:
+                    pass
 
             time.sleep(2)
             png = None
@@ -177,17 +189,20 @@ def _run_qr_login():
                 '.login-qrcode img',
                 'div[class*="qrcode"] img',
                 'canvas',
+                'img[src*="qrcode"]',
+                'svg',
             ]
             for sel in selectors:
-                el = page.query_selector(sel)
-                if el:
-                    try:
+                try:
+                    el = page.wait_for_selector(sel, timeout=5000)
+                    if el:
                         png = el.screenshot(type='png')
                         break
-                    except Exception:
-                        continue
+                except Exception:
+                    continue
+
             if not png:
-                panel = page.query_selector('div[class*="login"]')
+                panel = page.query_selector('div[class*="login"]') or page.query_selector('div[class*="qr"]')
                 png = panel.screenshot(type='png') if panel else page.screenshot(type='png')
 
             with _lock:
