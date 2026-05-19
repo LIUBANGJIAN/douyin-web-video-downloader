@@ -7,7 +7,7 @@ import douyin_client
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.0.0'
+APP_VERSION = 'v2.0.1'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
