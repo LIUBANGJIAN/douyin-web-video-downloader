@@ -1,9 +1,7 @@
 from flask import Flask, jsonify, request, send_file
+from yt_dlp import YoutubeDL
 import os
 import uuid
-
-import cookie_manager
-import douyin_client
 
 app = Flask(__name__)
 
@@ -13,7 +11,83 @@ app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-cookie_manager.start_monitor()
+
+def _sanitize_url(text):
+    if not text or not isinstance(text, str):
+        return ''
+    return text.strip()
+
+
+def _quality_format(quality):
+    q = str(quality or '').strip()
+    if q.lower() in ('best', 'worst', 'source'):
+        return q.lower()
+    if q.isdigit():
+        return f'bestvideo[height<={q}]+bestaudio/best'
+    return q or 'best'
+
+
+def _extract_info(video_url):
+    if not video_url:
+        raise ValueError('请输入抖音链接')
+
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'skip_download': True,
+        'noplaylist': True,
+    }
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(video_url, download=False)
+
+    if info.get('_type') == 'playlist':
+        entries = info.get('entries') or []
+        if not entries:
+            raise ValueError('无法解析视频信息')
+        info = entries[0]
+
+    if not info:
+        raise ValueError('无法解析视频信息')
+
+    title = info.get('title') or '抖音视频'
+    author = info.get('creator') or info.get('uploader') or info.get('uploader_id') or ''
+    thumbnail = info.get('thumbnail') or ''
+    duration = info.get('duration')
+
+    formats = info.get('formats') or []
+    heights = set()
+    for fmt in formats:
+        if fmt.get('vcodec') == 'none' or fmt.get('height') is None:
+            continue
+        heights.add(int(fmt['height']))
+
+    qualities = [str(h) for h in sorted(heights, reverse=True)]
+    if not qualities:
+        qualities = ['best']
+
+    return {
+        'url': video_url,
+        'title': title,
+        'author': author,
+        'thumbnail': thumbnail,
+        'duration': duration,
+        'qualities': qualities,
+        'defaultQuality': qualities[0],
+    }
+
+
+def _download_video(url, quality, dest_path):
+    format_str = _quality_format(quality)
+    ydl_opts = {
+        'format': format_str,
+        'outtmpl': dest_path,
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+    }
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+    return info
 
 
 @app.route('/')
@@ -23,69 +97,29 @@ def index():
 
 @app.route('/api/version')
 def version():
-    st = cookie_manager.get_status()
     return jsonify({
         'version': APP_VERSION,
-        'backend': 'Evil0ctal/Douyin_TikTok_Download_API',
-        'douyinApi': os.environ.get('DOUYIN_API_URL', 'http://127.0.0.1:80'),
-        'cookieStatus': st['status'],
-        'cookieMessage': st['message'],
+        'backend': 'yt-dlp',
     })
-
-
-@app.route('/api/cookie/status')
-def cookie_status():
-    return jsonify(cookie_manager.get_status())
-
-
-@app.route('/api/cookie/check', methods=['POST'])
-def cookie_check():
-    return jsonify(cookie_manager.check_validity(force=True))
-
-
-@app.route('/api/cookie/qrcode', methods=['POST'])
-def cookie_qrcode():
-    print('[app] /api/cookie/qrcode called')
-    return jsonify(cookie_manager.start_qr_login())
 
 
 @app.route('/api/info', methods=['POST'])
 def video_info():
-    st = cookie_manager.get_status()
-    if st['status'] != 'valid':
-        return jsonify({
-            'error': '请先扫码登录抖音',
-            'needLogin': True,
-            'cookieStatus': st['status'],
-        }), 401
-
     data = request.get_json() or {}
-    url = data.get('url', '')
+    url = _sanitize_url(data.get('url', ''))
     if not url:
         return jsonify({'error': '请输入抖音链接'}), 400
-
     try:
-        info = douyin_client.parse_video_info(url)
+        info = _extract_info(url)
         return jsonify({'success': True, **info})
     except Exception as e:
-        msg = str(e)
-        lower_msg = msg.lower()
-        if any(token in lower_msg for token in ('cookie', 'api 错误', '获取数据失败', '无效响应类型', 'invalid response type', 'http状态错误', 'http status code', 'bad request', '400')):
-            cookie_manager.check_validity(force=True)
-            return jsonify({'error': 'Cookie 已失效或解析失败，请重新扫码', 'needLogin': True}), 401
-        if '解析服务不可用' in msg:
-            return jsonify({'error': msg}), 502
-        return jsonify({'error': msg}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/download', methods=['POST'])
 def download_video():
-    st = cookie_manager.get_status()
-    if st['status'] != 'valid':
-        return jsonify({'error': '请先扫码登录抖音', 'needLogin': True}), 401
-
     data = request.get_json() or {}
-    url = data.get('url', '')
+    url = _sanitize_url(data.get('url', ''))
     quality = data.get('quality', 'best')
     if not url:
         return jsonify({'error': '请输入抖音链接'}), 400
@@ -94,35 +128,29 @@ def download_video():
     dest = os.path.join(app.config['UPLOAD_FOLDER'], f'{video_id}.mp4')
 
     try:
-        meta = douyin_client.download_video_file(url, quality, dest)
+        info = _download_video(url, quality, dest)
+        file_size = os.path.getsize(dest) if os.path.isfile(dest) else 0
         return jsonify({
             'success': True,
             'videoUrl': f'/download/{video_id}.mp4',
-            'title': meta['title'],
-            'author': meta['author'],
-            'thumbnail': meta.get('thumbnail', ''),
-            'fileSize': meta['fileSize'],
+            'title': info.get('title') or '',
+            'author': info.get('creator') or info.get('uploader') or '',
+            'thumbnail': info.get('thumbnail') or '',
+            'fileSize': file_size,
             'quality': quality,
             'version': APP_VERSION,
         })
     except Exception as e:
-        msg = str(e)
-        lower_msg = msg.lower()
-        if any(token in lower_msg for token in ('cookie', 'api 错误', '获取数据失败', '无效响应类型', 'invalid response type', 'http状态错误', 'http status code', 'bad request', '400')):
-            cookie_manager.check_validity(force=True)
-            return jsonify({'error': 'Cookie 已失效或解析失败，请重新扫码', 'needLogin': True}), 401
-        if '解析服务不可用' in msg:
-            return jsonify({'error': msg}), 502
-        return jsonify({'error': msg}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/download/<filename>')
 def serve_download(filename):
     safe = os.path.basename(filename)
-    return send_file(
-        os.path.join(app.config['UPLOAD_FOLDER'], safe),
-        as_attachment=True,
-    )
+    path = os.path.join(app.config['UPLOAD_FOLDER'], safe)
+    if not os.path.isfile(path):
+        return jsonify({'error': '文件不存在'}), 404
+    return send_file(path, as_attachment=True)
 
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -24,9 +24,6 @@
             font-size: 12px;
             margin: 4px;
         }
-        .badge.ok { background: rgba(76,175,80,.85); }
-        .badge.warn { background: rgba(244,67,54,.85); }
-        .badge.scan { background: rgba(255,152,0,.85); }
         .card {
             background: #fff;
             border-radius: 20px;
@@ -98,7 +95,6 @@
         .result.show { display: block; }
         .result.ok { background: #e8f5e9; color: #2e7d32; }
         .result.err { background: #ffebee; color: #c62828; }
-        .result.warn { background: #fff8e1; color: #f57c00; }
         .video-info { display: flex; gap: 12px; margin-top: 8px; }
         .video-info img {
             width: 72px; height: 72px;
@@ -134,43 +130,6 @@
             margin-right: 6px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        .qr-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,.65);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        .qr-overlay.show { display: flex; }
-        .qr-box {
-            background: #fff;
-            border-radius: 20px;
-            padding: 28px;
-            max-width: 340px;
-            width: 100%;
-            text-align: center;
-        }
-        .qr-box h2 { font-size: 18px; margin-bottom: 8px; }
-        .qr-box p { color: #666; font-size: 13px; margin-bottom: 16px; }
-        .qr-box img {
-            width: 220px; height: 220px;
-            object-fit: contain;
-            border: 1px solid #eee;
-            border-radius: 8px;
-        }
-        .qr-placeholder {
-            width: 220px; height: 220px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f5f5f5;
-            border-radius: 8px;
-        }
     </style>
 </head>
 <body>
@@ -179,7 +138,6 @@
             <div class="icon">🎵</div>
             <h1>抖音视频下载</h1>
             <span class="badge" id="version">v2.0.2</span>
-            <span class="badge" id="cookieBadge">Cookie 检测中</span>
         </div>
 
         <div class="card">
@@ -206,111 +164,11 @@
         </div>
 
         <div class="footer">
-            <p>基于 Evil0ctal/Douyin_TikTok_Download_API · 仅个人学习</p>
-        </div>
-    </div>
-
-    <div class="qr-overlay" id="qrOverlay">
-        <div class="qr-box">
-            <h2>抖音扫码登录</h2>
-            <p id="qrHint">请使用抖音 App 扫描下方二维码</p>
-            <div id="qrImageWrap">
-                <div class="qr-placeholder"><span class="loading" style="border-color:#fe2c55;border-top-color:transparent"></span></div>
-            </div>
-            <p style="margin-top:12px;font-size:12px;color:#999" id="qrStatus">正在生成二维码...</p>
+            <p>基于 yt-dlp 直接下载抖音视频</p>
         </div>
     </div>
 
     <script>
-        let pollTimer = null;
-
-        function showQrOverlay(show) {
-            document.getElementById('qrOverlay').classList.toggle('show', show);
-        }
-
-        function setQrImage(b64) {
-            const wrap = document.getElementById('qrImageWrap');
-            if (b64) {
-                wrap.innerHTML = '<img src="data:image/png;base64,' + b64 + '" alt="登录二维码">';
-            } else {
-                wrap.innerHTML = '<div class="qr-placeholder"><span class="loading" style="border-color:#fe2c55;border-top-color:transparent"></span></div>';
-            }
-        }
-
-        function updateCookieBadge(st) {
-            const el = document.getElementById('cookieBadge');
-            el.className = 'badge';
-            if (st.status === 'valid') {
-                el.textContent = '✅ 已登录';
-                el.classList.add('ok');
-                showQrOverlay(false);
-            } else if (st.status === 'scanning') {
-                el.textContent = '⏳ 扫码中';
-                el.classList.add('scan');
-                showQrOverlay(true);
-            } else {
-                el.textContent = '⚠️ 需扫码登录';
-                el.classList.add('warn');
-            }
-        }
-
-        async function pollCookieStatus() {
-            try {
-                const r = await fetch('/api/cookie/status');
-                const st = await r.json();
-                updateCookieBadge(st);
-                document.getElementById('qrStatus').textContent = st.message || '';
-                if (st.qrCode) setQrImage(st.qrCode);
-                if (st.status === 'valid') {
-                    clearInterval(pollTimer);
-                    pollTimer = null;
-                    showQrOverlay(false);
-                    return;
-                }
-                if (st.status === 'invalid' && !st.qrCode && pollTimer) {
-                    document.getElementById('qrStatus').textContent = st.message || '登录失败，请刷新重试';
-                }
-            } catch (e) {}
-        }
-
-        async function ensureLogin() {
-            const r = await fetch('/api/cookie/status');
-            const st = await r.json();
-            updateCookieBadge(st);
-            if (st.status === 'valid') return true;
-
-            showQrOverlay(true);
-            setQrImage('');
-            document.getElementById('qrStatus').textContent = '正在生成二维码...';
-            await fetch('/api/cookie/qrcode', { method: 'POST' });
-
-            if (!pollTimer) {
-                pollTimer = setInterval(pollCookieStatus, 1500);
-            }
-            pollCookieStatus();
-            return false;
-        }
-
-        async function initApp() {
-            try {
-                const r = await fetch('/api/version');
-                const d = await r.json();
-                document.getElementById('version').textContent = d.version || 'v2.0.0';
-            } catch (e) {}
-
-            const st = await (await fetch('/api/cookie/status')).json();
-            updateCookieBadge(st);
-            if (st.status !== 'valid') {
-                await ensureLogin();
-            } else {
-                setInterval(async () => {
-                    const s = await (await fetch('/api/cookie/status')).json();
-                    updateCookieBadge(s);
-                    if (s.status === 'invalid') await ensureLogin();
-                }, 60000);
-            }
-        }
-
         function showResult(html, type) {
             const box = document.getElementById('result');
             document.getElementById('resultBody').innerHTML = html;
@@ -336,7 +194,7 @@
             const sel = document.getElementById('quality');
             sel.innerHTML = '';
             const opts = [{ v: 'best', l: '最佳画质' }];
-            (qualities || []).forEach(q => opts.push({ v: String(q), l: q + 'P' }));
+            (qualities || []).forEach(q => opts.push({ v: String(q), l: String(q) + 'P' }));
             const seen = new Set();
             opts.forEach(o => {
                 if (seen.has(o.v)) return;
@@ -351,8 +209,6 @@
         }
 
         async function parseVideo() {
-            if (!(await ensureLogin())) return;
-
             const url = document.getElementById('url').value.trim();
             if (!url) { showResult('<p>请输入抖音链接</p>', 'err'); return; }
 
@@ -368,7 +224,6 @@
                     body: JSON.stringify({ url })
                 });
                 const d = await r.json();
-                if (d.needLogin) { await ensureLogin(); return; }
                 if (d.success) {
                     let thumb = '<div style="width:72px;height:72px;background:#eee;border-radius:8px"></div>';
                     if (d.thumbnail) thumb = '<img src="' + d.thumbnail + '" />';
@@ -391,8 +246,6 @@
         }
 
         async function downloadVideo() {
-            if (!(await ensureLogin())) return;
-
             const url = document.getElementById('url').value.trim();
             const quality = document.getElementById('quality').value;
             const btn = document.getElementById('downloadBtn');
@@ -407,7 +260,6 @@
                     body: JSON.stringify({ url, quality })
                 });
                 const d = await r.json();
-                if (d.needLogin) { await ensureLogin(); return; }
                 if (d.success) {
                     const mb = (d.fileSize / 1024 / 1024).toFixed(2);
                     showResult(
@@ -429,6 +281,15 @@
             const d = document.createElement('div');
             d.textContent = t;
             return d.innerHTML;
+        }
+
+        async function initApp() {
+            try {
+                const r = await fetch('/api/version');
+                const d = await r.json();
+                document.getElementById('version').textContent = d.version || 'v2.0.0';
+            } catch (e) {
+            }
         }
 
         document.getElementById('url').addEventListener('keypress', e => {
