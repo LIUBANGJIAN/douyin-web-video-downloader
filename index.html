@@ -534,6 +534,8 @@
             fetchQrcode();
         }
 
+        let currentQrcode = null;
+
         function startPolling() {
             stopPolling();
             loginPolling = setInterval(async () => {
@@ -545,29 +547,40 @@
                         const container = document.getElementById('qrcodeContainer');
                         const status = document.getElementById('loginStatus');
                         
-                        if (d.qrcode) {
+                        if (d.qrcode && d.qrcode !== currentQrcode) {
+                            currentQrcode = d.qrcode;
                             container.innerHTML = '<img src="data:image/png;base64,' + d.qrcode + '" />';
                         }
                         
                         if (d.status === 'waiting') {
-                            status.textContent = '请使用抖音扫码登录';
+                            if (status.textContent !== '请使用抖音扫码登录') {
+                                status.textContent = '请使用抖音扫码登录';
+                            }
                             status.className = 'status-text';
                         } else if (d.status === 'scanned') {
-                            status.textContent = '已扫码，请在抖音确认登录';
+                            if (status.textContent !== '已扫码，请在抖音确认登录') {
+                                status.textContent = '已扫码，请在抖音确认登录';
+                            }
                             status.className = 'status-text scanned';
                         } else if (d.status === 'success') {
-                            status.textContent = '登录成功！正在保存Cookie...';
+                            if (status.textContent !== '登录成功！正在保存Cookie...') {
+                                status.textContent = '登录成功！正在保存Cookie...';
+                            }
                             status.className = 'status-text success';
                             stopPolling();
                             document.getElementById('refreshBtn').style.display = 'none';
                             setTimeout(() => saveCookies(), 1000);
                         } else if (d.status === 'expired' || d.status === 'timeout') {
-                            status.textContent = d.message || '登录超时，请刷新';
+                            if (status.textContent !== (d.message || '登录超时，请刷新')) {
+                                status.textContent = d.message || '登录超时，请刷新';
+                            }
                             status.className = 'status-text error';
                             stopPolling();
                             document.getElementById('refreshBtn').style.display = 'block';
                         } else if (d.status === 'error') {
-                            status.textContent = d.message || '登录失败';
+                            if (status.textContent !== (d.message || '登录失败')) {
+                                status.textContent = d.message || '登录失败';
+                            }
                             status.className = 'status-text error';
                             stopPolling();
                             document.getElementById('refreshBtn').style.display = 'block';
@@ -576,7 +589,7 @@
                 } catch (e) {
                     console.error('轮询失败:', e);
                 }
-            }, 2000);
+            }, 3000);
         }
 
         function stopPolling() {

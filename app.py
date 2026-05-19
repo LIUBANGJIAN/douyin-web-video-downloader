@@ -338,6 +338,8 @@ def do_qrcode_login():
             
             max_wait_time = 180
             start_time = time.time()
+            screenshot_interval = 10
+            last_screenshot_time = time.time()
             
             while time.time() - start_time < max_wait_time:
                 try:
@@ -357,18 +359,21 @@ def do_qrcode_login():
                         app.logger.info("Login completed successfully")
                         return
                     
-                    page.wait_for_timeout(2000)
+                    page.wait_for_timeout(1000)
                     
-                    if login_qrcode_base64:
+                    current_time = time.time()
+                    if current_time - last_screenshot_time >= screenshot_interval:
                         try:
                             qrcode_screenshot = page.screenshot()
                             login_qrcode_base64 = base64.b64encode(qrcode_screenshot).decode('utf-8')
-                        except:
-                            pass
+                            last_screenshot_time = current_time
+                            app.logger.info("QR code refreshed")
+                        except Exception as screenshot_e:
+                            app.logger.error(f"Failed to refresh QR code: {str(screenshot_e)}")
                             
                 except Exception as e:
                     app.logger.error(f"Error during login polling: {str(e)}")
-                    page.wait_for_timeout(2000)
+                    page.wait_for_timeout(1000)
             
             browser.close()
             login_status = 'timeout'
