@@ -97,64 +97,103 @@ def _get_site_from_url(url):
 
 def _get_douyin_video_id(url):
     """从抖音链接中提取视频ID"""
+    # 处理短链接格式 https://v.douyin.com/MpeylZyxMTA/
+    short_pattern = r'v\.douyin\.com/([a-zA-Z0-9_-]+)'
+    match = re.search(short_pattern, url)
+    if match:
+        return match.group(1)
+    
+    # 处理视频页格式 https://www.douyin.com/video/7640697449463464185
     patterns = [
         r'/video/(\d+)',
-        r'/\d+/(")?(\d+)',
+        r'/(\d+)/',
         r'video_id=(\d+)',
         r'modal_id=(\d+)',
+        r'aweme_id=(\d+)',
     ]
     for pattern in patterns:
         match = re.search(pattern, url)
         if match:
-            return match.group(1) if match.lastindex == 1 else match.group(2) if match.lastindex == 2 else match.group(0)
+            return match.group(1)
     return None
 
 def _parse_douyin_url(url):
     """解析抖音分享链接，返回视频信息"""
     try:
-        # 处理短链接
-        if 'v.douyin.com' in url:
-            headers = {
-                'User-Agent': USER_AGENT,
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            }
-            response = requests.get(url, headers=headers, allow_redirects=True, timeout=10)
-            url = response.url
-        
         video_id = _get_douyin_video_id(url)
         if not video_id:
+            app.logger.error(f"无法提取视频ID: {url}")
             return None
         
-        # 调用抖音API获取视频信息
-        api_url = f'https://www.douyin.com/aweme/v1/web/aweme/detail/?aweme_id={video_id}&aid=1128&version_name=23.5.0&device_platform=android&os_version=2333'
+        # 尝试多个API端点
+        api_endpoints = [
+            f'https://www.douyin.com/aweme/v1/web/aweme/detail/?aweme_id={video_id}&aid=1128&version_name=23.5.0&device_platform=android&os_version=2333',
+            f'https://www.douyin.com/aweme/v1/web/aweme/detail/?aweme_id={video_id}&aid=6383&version_name=23.5.0&device_platform=android&os_version=2333',
+            f'https://api.douyin.com/aweme/v1/web/aweme/detail/?aweme_id={video_id}&aid=1128',
+        ]
         
         headers = {
             'User-Agent': USER_AGENT,
             'Referer': 'https://www.douyin.com/',
             'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Origin': 'https://www.douyin.com',
+            'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
         }
         
-        response = requests.get(api_url, headers=headers, timeout=10)
-        data = response.json()
+        data = None
+        for api_url in api_endpoints:
+            try:
+                response = requests.get(api_url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        if data.get('status_code') == 0 and data.get('aweme_detail'):
+                            break
+                    except:
+                        continue
+            except Exception as e:
+                app.logger.error(f"API调用失败 {api_url}: {str(e)}")
+                continue
         
-        if data.get('status_code') != 0:
+        if not data or data.get('status_code') != 0:
+            app.logger.error(f"API响应失败: {data}")
             return None
         
         aweme = data.get('aweme_detail', {})
         if not aweme:
+            app.logger.error("未找到视频详情")
             return None
         
         # 提取视频信息
         video_info = aweme.get('video', {})
-        play_addr = video_info.get('play_addr', {})
         
-        # 获取无水印视频链接
+        # 获取无水印视频链接 - 尝试多个位置
         video_url = None
+        play_addr = video_info.get('play_addr', {})
         if play_addr.get('url_list'):
             video_url = play_addr['url_list'][0]
+        else:
+            download_addr = video_info.get('download_addr', {})
+            if download_addr.get('url_list'):
+                video_url = download_addr['url_list'][0]
+            else:
+                bit_rate = video_info.get('bit_rate', [])
+                if bit_rate and len(bit_rate) > 0 and bit_rate[0].get('play_addr', {}).get('url_list'):
+                    video_url = bit_rate[0]['play_addr']['url_list'][0]
+        
+        if not video_url:
+            app.logger.error("未找到视频链接")
+            return None
         
         # 获取封面
-        cover = video_info.get('cover', {}).get('url_list', [''])[0] if video_info.get('cover') else ''
+        cover = ''
+        if video_info.get('cover', {}).get('url_list'):
+            cover = video_info['cover']['url_list'][0]
+        elif aweme.get('video', {}).get('origin_cover', {}).get('url_list'):
+            cover = aweme['video']['origin_cover']['url_list'][0]
         
         # 获取作者信息
         author = aweme.get('author', {})
