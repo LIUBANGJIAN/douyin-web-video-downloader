@@ -7,6 +7,9 @@ import subprocess
 from urllib.parse import urlparse
 import requests
 import time
+import threading
+import base64
+import json
 
 app = Flask(__name__)
 
@@ -20,6 +23,12 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 NODE_AVAILABLE = False
 NODE_VERSION = ""
 YTDLP_VERSION = ""
+PLAYWRIGHT_AVAILABLE = False
+
+login_status = 'idle'
+login_result = None
+login_qrcode_base64 = None
+login_thread = None
 
 def check_nodejs():
     global NODE_AVAILABLE, NODE_VERSION
@@ -48,6 +57,18 @@ def check_ytdlp():
 
 check_nodejs()
 check_ytdlp()
+
+def check_playwright():
+    global PLAYWRIGHT_AVAILABLE
+    try:
+        import playwright
+        PLAYWRIGHT_AVAILABLE = True
+        app.logger.info("✅ Playwright 可用")
+    except ImportError:
+        PLAYWRIGHT_AVAILABLE = False
+        app.logger.warning("❌ Playwright 不可用")
+
+check_playwright()
 
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
@@ -215,9 +236,149 @@ def version():
         'node_available': NODE_AVAILABLE,
         'node_version': NODE_VERSION,
         'ytdlp_version': YTDLP_VERSION,
+        'playwright_available': PLAYWRIGHT_AVAILABLE,
         'cookies_valid': cookies_valid,
         'cookies_updated': cookies_updated,
     })
+
+@app.route('/api/douyin/qrcode')
+def get_qrcode():
+    global login_status, login_result, login_qrcode_base64, login_thread
+    
+    if not PLAYWRIGHT_AVAILABLE:
+        return jsonify({'success': False, 'error': 'Playwright 未安装，请先安装 Playwright'})
+    
+    if login_status == 'starting' or login_status == 'waiting':
+        return jsonify({'success': True, 'qrcode': login_qrcode_base64, 'message': '获取二维码中...'})
+    
+    login_status = 'starting'
+    login_result = None
+    login_qrcode_base64 = None
+    
+    login_thread = threading.Thread(target=do_qrcode_login)
+    login_thread.daemon = True
+    login_thread.start()
+    
+    return jsonify({'success': True, 'message': '正在启动浏览器...'})
+
+@app.route('/api/douyin/login_status')
+def login_status_api():
+    global login_status, login_result, login_qrcode_base64
+    
+    if login_status == 'idle':
+        return jsonify({'success': True, 'status': 'idle', 'message': '未开始登录'})
+    
+    return jsonify({
+        'success': True,
+        'status': login_status,
+        'qrcode': login_qrcode_base64,
+        'message': login_result.get('message') if login_result else None,
+    })
+
+@app.route('/api/douyin/cookies_status')
+def cookies_status_api():
+    if os.path.exists(app.config['COOKIES_FILE']):
+        age_seconds = time.time() - os.path.getmtime(app.config['COOKIES_FILE'])
+        return jsonify({
+            'success': True,
+            'has_cookies': True,
+            'age_hours': round(age_seconds / 3600, 1),
+        })
+    return jsonify({'success': True, 'has_cookies': False, 'age_hours': 0})
+
+def do_qrcode_login():
+    global login_status, login_result, login_qrcode_base64
+    
+    from playwright.sync_api import sync_playwright
+    
+    try:
+        app.logger.info("Starting QR code login process")
+        login_status = 'starting'
+        
+        with sync_playwright() as p:
+            app.logger.info("Launching browser")
+            browser = p.chromium.launch(
+                headless=False, 
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--disable-web-security']
+            )
+            
+            context = browser.new_context(viewport={'width': 400, 'height': 600})
+            page = context.new_page()
+            
+            app.logger.info("Navigating to douyin.com")
+            page.goto('https://www.douyin.com', timeout=60000)
+            
+            page.wait_for_timeout(3000)
+            
+            login_button_selector = '//button[contains(text(), "登录")] | //a[contains(text(), "登录")] | //div[contains(@class, "login")]'
+            try:
+                login_button = page.wait_for_selector(login_button_selector, timeout=10000)
+                app.logger.info("Found login button, clicking...")
+                login_button.click()
+            except:
+                app.logger.info("Login button not found, continuing...")
+            
+            page.wait_for_timeout(3000)
+            
+            qrcode_selector = '//img[contains(@src, "qrcode")] | //div[contains(@class, "qrcode")] | //canvas'
+            try:
+                qrcode_element = page.wait_for_selector(qrcode_selector, timeout=15000)
+                app.logger.info("Found QR code element")
+                
+                login_status = 'waiting'
+                qrcode_screenshot = page.screenshot()
+                login_qrcode_base64 = base64.b64encode(qrcode_screenshot).decode('utf-8')
+                app.logger.info("QR code captured")
+            except Exception as e:
+                app.logger.error(f"Failed to find QR code: {str(e)}")
+                page.wait_for_timeout(2000)
+                qrcode_screenshot = page.screenshot()
+                login_qrcode_base64 = base64.b64encode(qrcode_screenshot).decode('utf-8')
+                login_status = 'waiting'
+            
+            max_wait_time = 180
+            start_time = time.time()
+            
+            while time.time() - start_time < max_wait_time:
+                try:
+                    cookies = context.cookies()
+                    session_cookies = [c for c in cookies if c['name'] in ['sessionid', 'sid_guard', 'uid_tt', 'uid_tt_ss']]
+                    
+                    if len(session_cookies) >= 2:
+                        app.logger.info("Login successful, saving cookies...")
+                        cookie_string = '; '.join([f"{c['name']}={c['value']}" for c in cookies])
+                        
+                        with open(app.config['COOKIES_FILE'], 'w', encoding='utf-8') as f:
+                            f.write(cookie_string)
+                        
+                        login_status = 'success'
+                        login_result = {'success': True, 'message': '登录成功'}
+                        browser.close()
+                        app.logger.info("Login completed successfully")
+                        return
+                    
+                    page.wait_for_timeout(2000)
+                    
+                    if login_qrcode_base64:
+                        try:
+                            qrcode_screenshot = page.screenshot()
+                            login_qrcode_base64 = base64.b64encode(qrcode_screenshot).decode('utf-8')
+                        except:
+                            pass
+                            
+                except Exception as e:
+                    app.logger.error(f"Error during login polling: {str(e)}")
+                    page.wait_for_timeout(2000)
+            
+            browser.close()
+            login_status = 'timeout'
+            login_result = {'success': False, 'message': '登录超时'}
+            app.logger.warning("Login timeout")
+            
+    except Exception as e:
+        app.logger.error(f"Login failed with exception: {str(e)}")
+        login_status = 'error'
+        login_result = {'success': False, 'message': f'登录失败: {str(e)}'}
 
 @app.route('/api/info', methods=['POST'])
 def video_info():
@@ -235,9 +396,9 @@ def video_info():
             if not NODE_AVAILABLE:
                 error_msg = '⚠️ 服务器 Node.js 环境未配置，无法解析抖音加密参数'
             else:
-                error_msg = '⚠️ 该视频需要登录才能下载，请先扫码获取Cookie'
+                error_msg = '⚠️ 该视频需要登录才能下载'
         elif 'Fresh cookies' in error_msg:
-            error_msg = '⚠️ 需要新鲜的抖音Cookie，请点击"扫码获取Cookie"按钮登录'
+            error_msg = '⚠️ 需要登录抖音账号才能下载此视频'
         return jsonify({'error': error_msg}), 500
 
 @app.route('/api/download', methods=['POST'])
@@ -271,9 +432,9 @@ def download_video():
             if not NODE_AVAILABLE:
                 error_msg = '⚠️ 服务器 Node.js 环境未配置，无法解析抖音加密参数'
             else:
-                error_msg = '⚠️ 该视频需要登录才能下载，请先扫码获取Cookie'
+                error_msg = '⚠️ 该视频需要登录才能下载'
         elif 'Fresh cookies' in error_msg:
-            error_msg = '⚠️ 需要新鲜的抖音Cookie，请点击"扫码获取Cookie"按钮登录'
+            error_msg = '⚠️ 需要登录抖音账号才能下载此视频'
         return jsonify({'error': error_msg}), 500
 
 @app.route('/download/<filename>')
