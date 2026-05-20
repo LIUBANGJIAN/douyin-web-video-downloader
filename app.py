@@ -6,7 +6,7 @@ import requests
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.4.6'
+APP_VERSION = 'v2.4.7'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
@@ -40,28 +40,29 @@ def _extract_url_from_text(text):
 def _parse_douyin_url(url):
     """解析抖音分享链接，返回视频/图片信息（参考 douyinVd 库的实现）"""
     try:
-        # 提取可能的ID
-        aweme_id = None
-        
         # 从短链接提取token
         match = re.search(r'v\.douyin\.com/([a-zA-Z0-9_-]+)', url)
         if match:
             token = match.group(1)
-            # 如果token看起来像数字ID，直接使用
-            if token.isdigit():
-                aweme_id = token
-            else:
-                # 尝试解析短链接获取真实ID
-                aweme_id = _resolve_short_url(token)
+            if not token.isdigit():
+                resolved = _resolve_short_url(token)
+                if resolved:
+                    if resolved['type'] == 'note':
+                        return _parse_douyin_note(resolved['id'])
+                    else:
+                        url = f'https://www.douyin.com/video/{resolved["id"]}'
         
-        # 如果没有找到，尝试从视频URL提取
-        if not aweme_id:
-            match = re.search(r'douyin\.com/video/(\d+)', url)
-            if match:
-                aweme_id = match.group(1)
+        # 直接是 /note/ 类型URL
+        match = re.search(r'douyin\.com/note/(\d+)', url)
+        if match:
+            return _parse_douyin_note(match.group(1))
         
-        # 如果还是没有，尝试从其他URL模式提取
-        if not aweme_id:
+        # 视频类型 - 提取ID
+        aweme_id = None
+        match = re.search(r'douyin\.com/video/(\d+)', url)
+        if match:
+            aweme_id = match.group(1)
+        else:
             match = re.search(r'share/video/(\d+)', url)
             if match:
                 aweme_id = match.group(1)
@@ -139,20 +140,24 @@ def _parse_douyin_url(url):
         return _parse_douyin_fallback(url, None)
 
 def _resolve_short_url(token):
-    """尝试解析短链接获取真实视频ID"""
+    """尝试解析短链接获取真实ID和类型"""
     try:
         headers = {
             'User-Agent': MOBILE_UA,
         }
         
-        # 使用移动UA访问短链接，获取重定向后的URL
         response = requests.get(f'https://v.douyin.com/{token}/', headers=headers, allow_redirects=True, timeout=15)
         final_url = response.url
         
-        # 从最终URL提取视频ID
+        # 视频类型
         match = re.search(r'/video/(\d+)', final_url)
         if match:
-            return match.group(1)
+            return {'type': 'video', 'id': match.group(1)}
+        
+        # 图文类型
+        match = re.search(r'/note/(\d+)', final_url)
+        if match:
+            return {'type': 'note', 'id': match.group(1)}
         
         return None
     except Exception as e:
@@ -232,6 +237,83 @@ def _parse_douyin_fallback(url, aweme_id=None):
         return None
     except Exception as e:
         app.logger.error(f"备用解析失败: {str(e)}")
+        return None
+
+def _parse_douyin_note(note_id):
+    """专门解析抖音图文链接"""
+    try:
+        headers = {
+            'User-Agent': MOBILE_UA,
+            'Referer': 'https://www.douyin.com/',
+        }
+        
+        # 方法1：尝试使用移动端分享页面（iesdouyin.com）
+        share_url = f'https://www.iesdouyin.com/share/note/{note_id}'
+        share_response = requests.get(share_url, headers=headers, timeout=15)
+        
+        img_list = _parse_douyin_images(share_response.text)
+        if img_list:
+            desc_match = re.search(r'"desc":\s*"([^"]+)"', share_response.text)
+            title = desc_match.group(1) if desc_match else ''
+            
+            nickname_match = re.search(r'"nickname":\s*"([^"]+)"', share_response.text)
+            author = nickname_match.group(1) if nickname_match else ''
+            
+            return {
+                'type': 'image',
+                'title': title,
+                'author': author,
+                'thumbnail': img_list[0] if img_list else '',
+                'image_url_list': img_list,
+            }
+        
+        # 方法2：尝试使用移动端API
+        api_url = f'https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={note_id}'
+        api_response = requests.get(api_url, headers=headers, timeout=15)
+        api_data = api_response.json()
+        
+        if api_data.get('status_code') == 0 and api_data.get('item_list'):
+            item = api_data['item_list'][0]
+            images = item.get('images', [])
+            if images:
+                img_list = []
+                for img in images:
+                    url_list = img.get('url_list', [])
+                    if url_list:
+                        img_list.append(url_list[0])
+                
+                if img_list:
+                    return {
+                        'type': 'image',
+                        'title': item.get('desc', ''),
+                        'author': item.get('author', {}).get('nickname', ''),
+                        'thumbnail': img_list[0] if img_list else '',
+                        'image_url_list': img_list,
+                    }
+        
+        # 方法3：尝试PC页面
+        pc_url = f'https://www.douyin.com/note/{note_id}'
+        pc_response = requests.get(pc_url, headers=headers, allow_redirects=True, timeout=15)
+        
+        img_list = _parse_douyin_images(pc_response.text)
+        if img_list:
+            desc_match = re.search(r'"desc":\s*"([^"]+)"', pc_response.text)
+            title = desc_match.group(1) if desc_match else ''
+            
+            nickname_match = re.search(r'"nickname":\s*"([^"]+)"', pc_response.text)
+            author = nickname_match.group(1) if nickname_match else ''
+            
+            return {
+                'type': 'image',
+                'title': title,
+                'author': author,
+                'thumbnail': img_list[0] if img_list else '',
+                'image_url_list': img_list,
+            }
+        
+        return None
+    except Exception as e:
+        app.logger.error(f"解析图文链接失败: {str(e)}")
         return None
 
 def _parse_douyin_images(body):
