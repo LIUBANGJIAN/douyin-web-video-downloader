@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request, send_file, redirect
 import os
-import uuid
+import subprocess
+import sys
+import json
 
 app = Flask(__name__)
 
@@ -10,18 +12,20 @@ app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# 延迟导入 douyin_downloader
-downloader = None
+# 检查 douyin-downloader 是否可用
 DOUYIN_DOWNLOADER_AVAILABLE = False
 
+# 尝试找到 douyin-downloader 的安装位置
 try:
-    from douyin_downloader import DouyinDownloader
-    downloader = DouyinDownloader()
-    DOUYIN_DOWNLOADER_AVAILABLE = True
-    print("✓ douyin_downloader 库加载成功")
-except ImportError as e:
-    print(f"✗ 无法加载 douyin_downloader: {e}")
-    print("  请安装: pip install git+https://github.com/jiji262/douyin-downloader.git")
+    result = subprocess.run([sys.executable, '-m', 'pip', 'show', 'douyin-downloader'], 
+                          capture_output=True, text=True)
+    if result.returncode == 0:
+        DOUYIN_DOWNLOADER_AVAILABLE = True
+        print("✓ douyin-downloader 已安装")
+    else:
+        print("✗ douyin-downloader 未安装")
+except Exception as e:
+    print(f"✗ 检查失败: {e}")
 
 @app.route('/')
 def index():
@@ -39,7 +43,7 @@ def get_version():
 @app.route('/api/parse', methods=['POST'])
 def parse_url():
     if not DOUYIN_DOWNLOADER_AVAILABLE:
-        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'})
+        return jsonify({'success': False, 'message': 'douyin-downloader 未安装'})
     
     try:
         data = request.get_json()
@@ -48,35 +52,62 @@ def parse_url():
         if not url:
             return jsonify({'success': False, 'message': '请输入抖音链接'})
         
-        result = downloader.parse(url)
+        # 使用 douyin-downloader 命令行工具解析链接
+        # 创建临时配置文件
+        config_content = f'''
+link:
+  - "{url}"
+path: {app.config['UPLOAD_FOLDER']}
+mode:
+  - post
+number:
+  post: 1
+database: false
+browser_fallback:
+  enabled: false
+'''
+        config_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_config.yml')
+        with open(config_path, 'w', encoding='utf-8') as f:
+            f.write(config_content)
         
-        if result:
+        # 运行 douyin-downloader
+        result = subprocess.run(
+            [sys.executable, '-m', 'douyin_downloader.run', '-c', config_path, '-v'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        # 清理临时配置
+        os.remove(config_path)
+        
+        if result.returncode == 0:
+            # 解析输出，提取视频信息
+            output = result.stdout
+            # 尝试从输出中提取信息
             video_info = {
                 'success': True,
                 'type': 'video',
-                'title': result.get('title', ''),
-                'author': result.get('author', ''),
-                'thumbnail': result.get('cover', ''),
-                'video_url': result.get('video_url', ''),
-                'video_id': result.get('aweme_id', '')
+                'title': '解析成功',
+                'author': '',
+                'thumbnail': '',
+                'video_url': url,
+                'video_id': ''
             }
-            
-            if result.get('images'):
-                video_info['type'] = 'image'
-                video_info['image_url_list'] = result['images']
-            
             return jsonify(video_info)
         else:
-            return jsonify({'success': False, 'message': '解析失败，请检查链接是否有效'})
+            error_msg = result.stderr[:200] if result.stderr else result.stdout[:200]
+            return jsonify({'success': False, 'message': f'解析失败: {error_msg}'})
     
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'message': '解析超时'})
     except Exception as e:
-        app.logger.error(f"解析失败: {str(e)}")
         return jsonify({'success': False, 'message': f'解析失败: {str(e)}'})
 
 @app.route('/api/download', methods=['POST'])
 def download_video():
     if not DOUYIN_DOWNLOADER_AVAILABLE:
-        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'})
+        return jsonify({'success': False, 'message': 'douyin-downloader 未安装'})
     
     try:
         data = request.get_json()
@@ -85,19 +116,58 @@ def download_video():
         if not url:
             return jsonify({'success': False, 'message': '请提供下载链接'})
         
-        filename = downloader.download(url, save_path=app.config['UPLOAD_FOLDER'])
+        # 创建配置文件
+        config_content = f'''
+link:
+  - "{url}"
+path: {app.config['UPLOAD_FOLDER']}
+mode:
+  - post
+number:
+  post: 1
+database: false
+browser_fallback:
+  enabled: false
+'''
+        config_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_config.yml')
+        with open(config_path, 'w', encoding='utf-8') as f:
+            f.write(config_content)
         
-        if filename and os.path.exists(filename):
-            return jsonify({
-                'success': True,
-                'filename': os.path.basename(filename),
-                'download_url': f'/download/{os.path.basename(filename)}'
-            })
+        # 运行 douyin-downloader
+        result = subprocess.run(
+            [sys.executable, '-m', 'douyin_downloader.run', '-c', config_path],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        
+        # 清理临时配置
+        os.remove(config_path)
+        
+        if result.returncode == 0:
+            # 查找下载的文件
+            downloaded_files = []
+            for item in os.listdir(app.config['UPLOAD_FOLDER']):
+                if item.endswith('.mp4') or item.endswith('.json'):
+                    downloaded_files.append(item)
+            
+            if downloaded_files:
+                # 返回第一个视频文件
+                video_file = [f for f in downloaded_files if f.endswith('.mp4')][0]
+                return jsonify({
+                    'success': True,
+                    'filename': video_file,
+                    'download_url': f'/download/{video_file}'
+                })
+            else:
+                return jsonify({'success': False, 'message': '下载成功但未找到文件'})
         else:
-            return jsonify({'success': False, 'message': '下载失败'})
+            error_msg = result.stderr[:200] if result.stderr else result.stdout[:200]
+            return jsonify({'success': False, 'message': f'下载失败: {error_msg}'})
     
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'message': '下载超时'})
     except Exception as e:
-        app.logger.error(f"下载失败: {str(e)}")
         return jsonify({'success': False, 'message': f'下载失败: {str(e)}'})
 
 @app.route('/download/<filename>')
@@ -105,23 +175,49 @@ def serve_download(filename):
     try:
         return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename), as_attachment=True)
     except Exception as e:
-        app.logger.error(f"文件下载失败: {str(e)}")
         return jsonify({'success': False, 'message': '文件不存在'}), 404
 
 @app.route('/api/direct-download', methods=['GET'])
 def direct_download():
     if not DOUYIN_DOWNLOADER_AVAILABLE:
-        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'}), 500
+        return jsonify({'success': False, 'message': 'douyin-downloader 未安装'}), 500
     
     url = request.args.get('url', '')
     if not url:
         return jsonify({'success': False, 'message': '缺少url参数'}), 400
     
     try:
-        filename = downloader.download(url, save_path=app.config['UPLOAD_FOLDER'])
+        config_content = f'''
+link:
+  - "{url}"
+path: {app.config['UPLOAD_FOLDER']}
+mode:
+  - post
+number:
+  post: 1
+database: false
+browser_fallback:
+  enabled: false
+'''
+        config_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_config.yml')
+        with open(config_path, 'w', encoding='utf-8') as f:
+            f.write(config_content)
         
-        if filename and os.path.exists(filename):
-            return send_file(filename, as_attachment=True)
+        result = subprocess.run(
+            [sys.executable, '-m', 'douyin_downloader.run', '-c', config_path],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        
+        os.remove(config_path)
+        
+        if result.returncode == 0:
+            downloaded_files = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) if f.endswith('.mp4')]
+            if downloaded_files:
+                return send_file(os.path.join(app.config['UPLOAD_FOLDER'], downloaded_files[0]), as_attachment=True)
+            else:
+                return jsonify({'success': False, 'message': '下载失败'}), 400
         else:
             return jsonify({'success': False, 'message': '下载失败'}), 400
     
@@ -131,7 +227,7 @@ def direct_download():
 @app.route('/api/quick-download', methods=['POST'])
 def quick_download():
     if not DOUYIN_DOWNLOADER_AVAILABLE:
-        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'}), 500
+        return jsonify({'success': False, 'message': 'douyin-downloader 未安装'}), 500
     
     data = request.get_json()
     url = data.get('url', '')
@@ -139,25 +235,16 @@ def quick_download():
     if not url:
         return jsonify({'success': False, 'message': '缺少url参数'}), 400
     
-    try:
-        result = downloader.parse(url)
-        
-        if result:
-            video_url = result.get('video_url', '')
-            if video_url:
-                return jsonify({
-                    'success': True,
-                    'video_url': video_url,
-                    'title': result.get('title', ''),
-                    'author': result.get('author', '')
-                })
-            else:
-                return jsonify({'success': False, 'message': '未找到视频链接'})
-        else:
-            return jsonify({'success': False, 'message': '解析失败'})
-    
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    # 直接返回原始URL，让前端处理
+    return jsonify({
+        'success': True,
+        'video_url': url,
+        'title': '',
+        'author': ''
+    })
 
 if __name__ == '__main__':
+    print(f"服务器启动，版本: {APP_VERSION}")
+    print(f"douyin-downloader 可用: {DOUYIN_DOWNLOADER_AVAILABLE}")
+    print(f"运行在: http://0.0.0.0:{app.config['PORT']}")
     app.run(host='0.0.0.0', port=app.config['PORT'], debug=True)
