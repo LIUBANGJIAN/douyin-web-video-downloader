@@ -6,7 +6,7 @@ import json
 
 app = Flask(__name__)
 
-APP_VERSION = 'v3.0.0'
+APP_VERSION = 'v3.0.1'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
@@ -14,14 +14,26 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # 检查 douyin-downloader 是否可用
 DOUYIN_DOWNLOADER_AVAILABLE = False
+DOUYIN_DOWNLOADER_RUN_PATH = ""
 
-# 尝试找到 douyin-downloader 的安装位置
+# 尝试找到 douyin-downloader 的安装位置和 run.py 路径
 try:
     result = subprocess.run([sys.executable, '-m', 'pip', 'show', 'douyin-downloader'], 
                           capture_output=True, text=True)
     if result.returncode == 0:
-        DOUYIN_DOWNLOADER_AVAILABLE = True
-        print("✓ douyin-downloader 已安装")
+        # 解析安装位置
+        for line in result.stdout.split('\n'):
+            if line.startswith('Location:'):
+                location = line.split(':', 1)[1].strip()
+                # 查找 run.py 文件
+                run_path = os.path.join(location, 'douyin_downloader', 'run.py')
+                if os.path.exists(run_path):
+                    DOUYIN_DOWNLOADER_RUN_PATH = run_path
+                    DOUYIN_DOWNLOADER_AVAILABLE = True
+                    print(f"✓ douyin-downloader 已安装，run.py 路径: {run_path}")
+                break
+        if not DOUYIN_DOWNLOADER_AVAILABLE:
+            print("✗ 未找到 run.py")
     else:
         print("✗ douyin-downloader 未安装")
 except Exception as e:
@@ -72,7 +84,7 @@ browser_fallback:
         
         # 运行 douyin-downloader
         result = subprocess.run(
-            [sys.executable, '-m', 'douyin_downloader.run', '-c', config_path, '-v'],
+            [sys.executable, DOUYIN_DOWNLOADER_RUN_PATH, '-c', config_path, '-v'],
             capture_output=True,
             text=True,
             timeout=60
@@ -135,7 +147,7 @@ browser_fallback:
         
         # 运行 douyin-downloader
         result = subprocess.run(
-            [sys.executable, '-m', 'douyin_downloader.run', '-c', config_path],
+            [sys.executable, DOUYIN_DOWNLOADER_RUN_PATH, '-c', config_path],
             capture_output=True,
             text=True,
             timeout=120
@@ -204,7 +216,7 @@ browser_fallback:
             f.write(config_content)
         
         result = subprocess.run(
-            [sys.executable, '-m', 'douyin_downloader.run', '-c', config_path],
+            [sys.executable, DOUYIN_DOWNLOADER_RUN_PATH, '-c', config_path],
             capture_output=True,
             text=True,
             timeout=120
