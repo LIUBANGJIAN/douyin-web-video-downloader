@@ -1,8 +1,11 @@
-import subprocess
 import sys
+import os
+
+os.environ['FLASK_ENV'] = 'production'
+
+from app import app
 
 if __name__ == '__main__':
-    subprocess.run([sys.executable, '-m', 'flask', 'run', '--host=0.0.0.0', '--port=8787'], 
-                   env={'FLASK_APP': 'app.py'},
-                   cwd='G:\\trae\\视频下载网站',
-                   check=True)
+    port = app.config['PORT']
+    print(f"启动服务器在端口 {port}...")
+    app.run(host='0.0.0.0', port=port, threaded=True, use_reloader=False)

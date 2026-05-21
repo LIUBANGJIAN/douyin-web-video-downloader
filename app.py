@@ -6,7 +6,7 @@ import requests
 
 app = Flask(__name__)
 
-APP_VERSION = 'v2.5.3'
+APP_VERSION = 'v2.5.5'
 app.config['UPLOAD_FOLDER'] = os.environ.get('DOWNLOAD_DIR', '/app/downloads')
 app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
@@ -52,9 +52,17 @@ def _extract_url_from_text(text):
 
 def _parse_douyin_url(url):
     """解析抖音分享链接，返回视频/图片信息"""
+    # 添加日志到文件
+    with open('parse_log.txt', 'a', encoding='utf-8') as f:
+        f.write(f"\n{'='*50}\n")
+        f.write(f"时间: {__import__('datetime').datetime.now()}\n")
+        f.write(f"URL: {url}\n")
+    
     try:
         # 优先使用 Playwright 解析
         if _init_playwright():
+            with open('parse_log.txt', 'a', encoding='utf-8') as f:
+                f.write("尝试使用 Playwright\n")
             print(f"优先使用 Playwright 解析: {url}")
             try:
                 result = parse_with_playwright(url)
@@ -71,6 +79,8 @@ def _parse_douyin_url(url):
         match = re.search(r'v\.douyin\.com/([a-zA-Z0-9_-]+)', url)
         if match:
             token = match.group(1)
+            with open('parse_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"提取的token: {token}\n")
             if not token.isdigit():
                 resolved = _resolve_short_url(token)
                 if resolved:
@@ -100,7 +110,12 @@ def _parse_douyin_url(url):
                 aweme_id = match.group(1)
         
         if not aweme_id:
+            with open('parse_log.txt', 'a', encoding='utf-8') as f:
+                f.write("无法提取aweme_id，返回None\n")
             return None
+        
+        with open('parse_log.txt', 'a', encoding='utf-8') as f:
+            f.write(f"提取到aweme_id: {aweme_id}\n")
         
         # 使用API获取视频详情
         headers = {
@@ -111,62 +126,72 @@ def _parse_douyin_url(url):
         
         api_url = f'https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={aweme_id}'
         
-        response = requests.get(api_url, headers=headers, timeout=15)
-        data = response.json()
+        with open('parse_log.txt', 'a', encoding='utf-8') as f:
+            f.write(f"API URL: {api_url}\n")
         
-        if data.get('status_code') == 0 and data.get('item_list'):
-            item = data['item_list'][0]
+        try:
+            response = requests.get(api_url, headers=headers, timeout=15)
+            with open('parse_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"API状态码: {response.status_code}\n")
             
-            # 视频类型
-            if item.get('video'):
-                video = item['video']
-                play_addr = video.get('play_addr', {})
-                url_list = play_addr.get('url_list', [])
+            data = response.json()
+            
+            with open('parse_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"API响应状态: {data.get('status_code')}\n")
+            
+            if data.get('status_code') == 0 and data.get('item_list'):
+                item = data['item_list'][0]
                 
-                if url_list:
-                    video_url = url_list[0]
-                    if 'ratio=' not in video_url:
-                        video_url = f'{video_url}&ratio=1080p'
+                # 视频类型
+                if item.get('video'):
+                    video = item['video']
+                    play_addr = video.get('play_addr', {})
+                    url_list = play_addr.get('url_list', [])
                     
-                    title = item.get('desc', '')
-                    author = item.get('author', {}).get('nickname', '')
-                    cover_list = video.get('cover', {}).get('url_list', [])
-                    thumbnail = cover_list[0] if cover_list else ''
-                    
-                    return {
-                        'type': 'video',
-                        'title': title,
-                        'author': author,
-                        'thumbnail': thumbnail,
-                        'video_url': video_url,
-                        'video_id': aweme_id,
-                    }
-            
-            # 图片类型
-            if item.get('images'):
-                images = item['images']
-                img_list = []
-                for img in images:
-                    url_list = img.get('url_list', [])
                     if url_list:
-                        img_list.append(url_list[0])
-                
-                if img_list:
-                    title = item.get('desc', '')
-                    author = item.get('author', {}).get('nickname', '')
+                        video_url = url_list[0]
+                        if 'ratio=' not in video_url:
+                            video_url = f'{video_url}&ratio=1080p'
+                        
+                        title = item.get('desc', '')
+                        author = item.get('author', {}).get('nickname', '')
+                        cover_list = video.get('cover', {}).get('url_list', [])
+                        thumbnail = cover_list[0] if cover_list else ''
+                        
+                        return {
+                            'type': 'video',
+                            'title': title,
+                            'author': author,
+                            'thumbnail': thumbnail,
+                            'video_url': video_url,
+                            'video_id': aweme_id,
+                        }
+            
+                # 图片类型
+                if item.get('images'):
+                    images = item['images']
+                    img_list = []
+                    for img in images:
+                        url_list = img.get('url_list', [])
+                        if url_list:
+                            img_list.append(url_list[0])
                     
-                    return {
-                        'type': 'image',
-                        'title': title,
-                        'author': author,
-                        'thumbnail': img_list[0] if img_list else '',
-                        'image_url_list': img_list,
-                    }
+                    if img_list:
+                        title = item.get('desc', '')
+                        author = item.get('author', {}).get('nickname', '')
+                        
+                        return {
+                            'type': 'image',
+                            'title': title,
+                            'author': author,
+                            'thumbnail': img_list[0] if img_list else '',
+                            'image_url_list': img_list,
+                        }
         
-        # 如果上面的方法失败，尝试备用方法
-        result = _parse_douyin_fallback(url, aweme_id)
-        if result:
-            return result
+            # 如果上面的方法失败，尝试备用方法
+            result = _parse_douyin_fallback(url, aweme_id)
+            if result:
+                return result
         
         return None
         
@@ -192,17 +217,28 @@ def _resolve_short_url(token):
             'User-Agent': MOBILE_UA,
         }
         
+        with open('parse_log.txt', 'a', encoding='utf-8') as f:
+            f.write(f"解析短链接 token: {token}\n")
+        
         response = requests.get(f'https://v.douyin.com/{token}/', headers=headers, allow_redirects=True, timeout=15)
         final_url = response.url
+        
+        with open('parse_log.txt', 'a', encoding='utf-8') as f:
+            f.write(f"短链接状态码: {response.status_code}\n")
+            f.write(f"重定向后URL: {final_url}\n")
         
         # 视频类型
         match = re.search(r'/video/(\d+)', final_url)
         if match:
+            with open('parse_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"提取视频ID: {match.group(1)}\n")
             return {'type': 'video', 'id': match.group(1)}
         
         # 图文类型 - 支持 /note/ 和 /share/note/ 格式
         match = re.search(r'/note/(\d+)', final_url)
         if match:
+            with open('parse_log.txt', 'a', encoding='utf-8') as f:
+                f.write(f"提取图文ID: {match.group(1)}\n")
             return {'type': 'note', 'id': match.group(1)}
         
         # 分享视频类型
