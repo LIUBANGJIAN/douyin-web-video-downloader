@@ -467,10 +467,13 @@
             try {
                 const r = await fetch('/api/version?' + Date.now());
                 const d = await r.json();
+                console.log('Version API response:', d);
                 document.getElementById('version').textContent = d.version || 'v2.5.0';
                 document.getElementById('backend').textContent = d.backend || 'douyinVd';
-                document.getElementById('playwright').textContent = d.playwright ? 'Playwright ✓' : 'Playwright ✗';
-                document.getElementById('playwright').style.background = d.playwright ? 'rgba(76,175,80,.8)' : 'rgba(255,193,7,.8)';
+                const pwStatus = d.playwright === true || d.playwright === 'true';
+                console.log('Playwright status:', d.playwright, '->', pwStatus);
+                document.getElementById('playwright').textContent = pwStatus ? 'Playwright ✓' : 'Playwright ✗';
+                document.getElementById('playwright').style.background = pwStatus ? 'rgba(76,175,80,.8)' : 'rgba(255,193,7,.8)';
             } catch (e) {
                 console.error('Failed to fetch version:', e);
                 document.getElementById('version').textContent = 'v2.5.0';
