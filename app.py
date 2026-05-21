@@ -1,7 +1,6 @@
 from flask import Flask, jsonify, request, send_file, redirect
 import os
 import uuid
-from douyin_downloader import DouyinDownloader
 
 app = Flask(__name__)
 
@@ -11,7 +10,18 @@ app.config['PORT'] = int(os.environ.get('PORT', 8787))
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-downloader = DouyinDownloader()
+# 延迟导入 douyin_downloader
+downloader = None
+DOUYIN_DOWNLOADER_AVAILABLE = False
+
+try:
+    from douyin_downloader import DouyinDownloader
+    downloader = DouyinDownloader()
+    DOUYIN_DOWNLOADER_AVAILABLE = True
+    print("✓ douyin_downloader 库加载成功")
+except ImportError as e:
+    print(f"✗ 无法加载 douyin_downloader: {e}")
+    print("  请安装: pip install git+https://github.com/jiji262/douyin-downloader.git")
 
 @app.route('/')
 def index():
@@ -22,11 +32,15 @@ def get_version():
     return jsonify({
         'version': APP_VERSION,
         'backend': 'douyin-downloader',
-        'playwright': False
+        'playwright': False,
+        'douyin_downloader': DOUYIN_DOWNLOADER_AVAILABLE
     })
 
 @app.route('/api/parse', methods=['POST'])
 def parse_url():
+    if not DOUYIN_DOWNLOADER_AVAILABLE:
+        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'})
+    
     try:
         data = request.get_json()
         url = data.get('url', '').strip()
@@ -34,7 +48,6 @@ def parse_url():
         if not url:
             return jsonify({'success': False, 'message': '请输入抖音链接'})
         
-        # 使用 douyin-downloader 解析链接
         result = downloader.parse(url)
         
         if result:
@@ -48,7 +61,6 @@ def parse_url():
                 'video_id': result.get('aweme_id', '')
             }
             
-            # 检查是否是图片类型
             if result.get('images'):
                 video_info['type'] = 'image'
                 video_info['image_url_list'] = result['images']
@@ -63,6 +75,9 @@ def parse_url():
 
 @app.route('/api/download', methods=['POST'])
 def download_video():
+    if not DOUYIN_DOWNLOADER_AVAILABLE:
+        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'})
+    
     try:
         data = request.get_json()
         url = data.get('url', '')
@@ -70,7 +85,6 @@ def download_video():
         if not url:
             return jsonify({'success': False, 'message': '请提供下载链接'})
         
-        # 使用 douyin-downloader 下载
         filename = downloader.download(url, save_path=app.config['UPLOAD_FOLDER'])
         
         if filename and os.path.exists(filename):
@@ -96,6 +110,9 @@ def serve_download(filename):
 
 @app.route('/api/direct-download', methods=['GET'])
 def direct_download():
+    if not DOUYIN_DOWNLOADER_AVAILABLE:
+        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'}), 500
+    
     url = request.args.get('url', '')
     if not url:
         return jsonify({'success': False, 'message': '缺少url参数'}), 400
@@ -113,6 +130,9 @@ def direct_download():
 
 @app.route('/api/quick-download', methods=['POST'])
 def quick_download():
+    if not DOUYIN_DOWNLOADER_AVAILABLE:
+        return jsonify({'success': False, 'message': 'douyin_downloader 库未安装'}), 500
+    
     data = request.get_json()
     url = data.get('url', '')
     
