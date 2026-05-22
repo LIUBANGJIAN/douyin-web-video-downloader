@@ -256,10 +256,11 @@ browser_fallback:
                     'download_url': f'/download/{video_file}'
                 })
             else:
-                logger.error(f"下载成功但未找到文件: {url}")
-                return jsonify({'success': False, 'message': '下载成功但未找到文件'})
+                cmd_output = result.stderr[:1000] if result.stderr else result.stdout[:1000]
+                logger.error(f"下载成功但未找到文件: {url}, 命令输出: {cmd_output}")
+                return jsonify({'success': False, 'message': '下载成功但未找到文件，请检查日志'})
         else:
-            error_msg = result.stderr[:200] if result.stderr else result.stdout[:200]
+            error_msg = result.stderr[:500] if result.stderr else result.stdout[:500]
             logger.error(f"视频下载失败: {url}, 错误: {error_msg}")
             return jsonify({'success': False, 'message': f'下载失败: {error_msg}'})
     
@@ -298,17 +299,21 @@ def direct_download():
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         config_path = os.path.join(CONFIG_DIR, f'direct_config_{timestamp}.yml')
+        download_path = DOWNLOAD_DIR.replace('\\', '/')
+        cookies_path = os.path.join(BASE_DIR, '.cookies.json').replace('\\', '/')
         config_content = f'''
 link:
   - "{url}"
-path: {DOWNLOAD_DIR}
+path: "{download_path}"
+cookies: "{cookies_path}"
 mode:
   - post
 number:
   post: 1
 database: false
 browser_fallback:
-  enabled: false
+  enabled: true
+  headless: true
 '''
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(config_content)
@@ -331,11 +336,13 @@ browser_fallback:
                 logger.info(f"直接下载成功: {video_file}")
                 return send_file(os.path.join(DOWNLOAD_DIR, video_file), as_attachment=True)
             else:
-                logger.error(f"直接下载失败，未找到文件: {url}")
-                return jsonify({'success': False, 'message': '下载失败'}), 400
+                error_msg = result.stderr[:500] if result.stderr else result.stdout[:500]
+                logger.error(f"直接下载命令成功但未找到文件: {url}, 命令输出: {error_msg}")
+                return jsonify({'success': False, 'message': '下载成功但未找到文件，请检查日志'}), 400
         else:
-            logger.error(f"直接下载失败: {url}")
-            return jsonify({'success': False, 'message': '下载失败'}), 400
+            error_msg = result.stderr[:500] if result.stderr else result.stdout[:500]
+            logger.error(f"直接下载失败: {url}, 错误: {error_msg}")
+            return jsonify({'success': False, 'message': f'下载失败: {error_msg}'}), 400
     
     except Exception as e:
         logger.error(f"直接下载异常: {url}, 错误: {str(e)}")
