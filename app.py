@@ -8,7 +8,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-APP_VERSION = 'v3.1.0'
+APP_VERSION = 'v3.1.1'
 
 # 定义目录结构
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,6 +50,51 @@ def setup_logging():
 
 logger = setup_logging()
 
+# 创建环境变量解决 Unicode 编码问题
+def get_douyin_env():
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    env['LANG'] = 'en_US.UTF-8'
+    return env
+
+# 安全执行 douyin-dl 命令
+def run_douyin_command(args, timeout=60):
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=get_douyin_env(),
+            errors='replace'
+        )
+        return result
+    except Exception as e:
+        # 如果 text=True 失败，尝试使用 bytes 模式
+        try:
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                timeout=timeout,
+                env=get_douyin_env()
+            )
+            # 手动解码，忽略错误
+            stdout = result.stdout.decode('utf-8', errors='replace') if result.stdout else ''
+            stderr = result.stderr.decode('utf-8', errors='replace') if result.stderr else ''
+            # 返回一个类似 subprocess.CompletedProcess 的对象
+            return type('CompletedProcess', (), {
+                'returncode': result.returncode,
+                'stdout': stdout,
+                'stderr': stderr
+            })
+        except Exception as e2:
+            logger.error(f"运行 douyin-dl 命令失败: {e2}")
+            return type('CompletedProcess', (), {
+                'returncode': -1,
+                'stdout': '',
+                'stderr': str(e2)
+            })
+
 # 检查 douyin-downloader 是否可用
 DOUYIN_DOWNLOADER_AVAILABLE = False
 DOUYIN_DOWNLOADER_CMD = "douyin-dl"
@@ -57,9 +102,13 @@ DOUYIN_DOWNLOADER_CMD = "douyin-dl"
 def check_douyin_downloader():
     global DOUYIN_DOWNLOADER_AVAILABLE, DOUYIN_DOWNLOADER_CMD
     
+    # 设置环境变量解决 Unicode 编码问题
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    env['LANG'] = 'en_US.UTF-8'
+    
     try:
-        result = subprocess.run([DOUYIN_DOWNLOADER_CMD, '--version'],
-                              capture_output=True, text=True, timeout=30)
+        result = run_douyin_command([DOUYIN_DOWNLOADER_CMD, '--version'], timeout=30)
         if result.returncode == 0 and result.stdout:
             DOUYIN_DOWNLOADER_AVAILABLE = True
             logger.info(f"douyin-downloader 已安装: {result.stdout.strip()}")
@@ -114,12 +163,7 @@ browser_fallback:
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(config_content)
         
-        result = subprocess.run(
-            [DOUYIN_DOWNLOADER_CMD, '-c', config_path, '-v'],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
+        result = run_douyin_command([DOUYIN_DOWNLOADER_CMD, '-c', config_path, '-v'], timeout=60)
         
         os.remove(config_path)
         
@@ -179,12 +223,7 @@ browser_fallback:
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(config_content)
         
-        result = subprocess.run(
-            [DOUYIN_DOWNLOADER_CMD, '-c', config_path],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        result = run_douyin_command([DOUYIN_DOWNLOADER_CMD, '-c', config_path], timeout=120)
         
         os.remove(config_path)
         
@@ -266,12 +305,7 @@ browser_fallback:
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(config_content)
         
-        result = subprocess.run(
-            [DOUYIN_DOWNLOADER_CMD, '-c', config_path],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        result = run_douyin_command([DOUYIN_DOWNLOADER_CMD, '-c', config_path], timeout=120)
         
         os.remove(config_path)
         

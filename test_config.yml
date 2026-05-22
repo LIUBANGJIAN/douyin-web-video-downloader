@@ -1,0 +1,10 @@
+link:
+  - "https://v.douyin.com/MpeyIZyxMTA/"
+path: G:\trae\视频下载网站\downloads
+mode:
+  - post
+number:
+  post: 1
+database: false
+browser_fallback:
+  enabled: false
