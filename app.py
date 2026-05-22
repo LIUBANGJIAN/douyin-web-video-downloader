@@ -8,7 +8,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-APP_VERSION = 'v3.1.1'
+APP_VERSION = 'v3.2.1'
 
 # 定义目录结构
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -147,17 +147,21 @@ def parse_url():
         
         logger.info(f"开始解析链接: {url}")
         
+        download_path = DOWNLOAD_DIR.replace('\\', '/')
+        cookies_path = os.path.join(BASE_DIR, '.cookies.json').replace('\\', '/')
         config_content = f'''
 link:
   - "{url}"
-path: {DOWNLOAD_DIR}
+path: "{download_path}"
+cookies: "{cookies_path}"
 mode:
   - post
 number:
   post: 1
 database: false
 browser_fallback:
-  enabled: false
+  enabled: true
+  headless: true
 '''
         config_path = os.path.join(CONFIG_DIR, 'temp_config.yml')
         with open(config_path, 'w', encoding='utf-8') as f:
@@ -208,17 +212,21 @@ def download_video():
         # 使用时间戳创建唯一的配置文件
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         config_path = os.path.join(CONFIG_DIR, f'temp_config_{timestamp}.yml')
+        download_path = DOWNLOAD_DIR.replace('\\', '/')
+        cookies_path = os.path.join(BASE_DIR, '.cookies.json').replace('\\', '/')
         config_content = f'''
 link:
   - "{url}"
-path: {DOWNLOAD_DIR}
+path: "{download_path}"
+cookies: "{cookies_path}"
 mode:
   - post
 number:
   post: 1
 database: false
 browser_fallback:
-  enabled: false
+  enabled: true
+  headless: true
 '''
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(config_content)

@@ -7,7 +7,7 @@ git_path = r"C:\Program Files\Git\bin\git.exe"
 
 commands = [
     [git_path, "add", "."],
-    [git_path, "commit", "-m", "v3.1.1: Fix Unicode encoding issue with douyin-dl command"],
+    [git_path, "commit", "-m", "v3.2.1: Enable browser fallback mode and add cookies support"],
     [git_path, "push", "origin", "master"]
 ]
 
