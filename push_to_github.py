@@ -7,7 +7,7 @@ git_path = r"C:\Program Files\Git\bin\git.exe"
 
 commands = [
     [git_path, "add", "."],
-    [git_path, "commit", "-m", "v3.0.7: Fix bug - return latest downloaded video file instead of first one"],
+    [git_path, "commit", "-m", "v3.1.0: Restructure project with separate config/logs/downloads directories, add logging"],
     [git_path, "push", "origin", "master"]
 ]
 

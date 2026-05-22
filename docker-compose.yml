@@ -8,8 +8,12 @@ services:
     ports:
       - "8787:8787"
     volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
       - ./downloads:/app/downloads
     environment:
       - PORT=8787
+      - CONFIG_DIR=/app/config
+      - LOG_DIR=/app/logs
       - DOWNLOAD_DIR=/app/downloads
     restart: unless-stopped
