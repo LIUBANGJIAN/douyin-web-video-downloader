@@ -9,7 +9,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-APP_VERSION = 'v3.2.1'
+APP_VERSION = 'v3.2.2'
 
 # 定义目录结构
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
