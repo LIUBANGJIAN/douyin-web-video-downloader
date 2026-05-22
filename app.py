@@ -4,6 +4,7 @@ import subprocess
 import sys
 import json
 import logging
+import re
 from datetime import datetime
 
 app = Flask(__name__)
@@ -95,6 +96,32 @@ def run_douyin_command(args, timeout=60):
                 'stderr': str(e2)
             })
 
+# 从文本中提取抖音URL
+def extract_douyin_url(text: str) -> str:
+    """从用户输入的文本中提取有效的抖音URL"""
+    if not text:
+        return ""
+    
+    # 匹配抖音短链接
+    short_url_pattern = r'https?://v\.douyin\.com/[A-Za-z0-9_-]+'
+    match = re.search(short_url_pattern, text)
+    if match:
+        return match.group(0)
+    
+    # 匹配抖音长链接
+    long_url_pattern = r'https?://www\.douyin\.com/video/\d+'
+    match = re.search(long_url_pattern, text)
+    if match:
+        return match.group(0)
+    
+    # 匹配不带 https 的短链
+    short_url_no_scheme = r'v\.douyin\.com/[A-Za-z0-9_-]+'
+    match = re.search(short_url_no_scheme, text)
+    if match:
+        return 'https://' + match.group(0)
+    
+    return ""
+
 # 检查 douyin-downloader 是否可用
 DOUYIN_DOWNLOADER_AVAILABLE = False
 DOUYIN_DOWNLOADER_CMD = "douyin-dl"
@@ -140,10 +167,16 @@ def parse_url():
     
     try:
         data = request.get_json()
-        url = data.get('url', '').strip()
+        input_text = data.get('url', '').strip()
+        
+        if not input_text:
+            return jsonify({'success': False, 'message': '请输入抖音链接'})
+        
+        # 提取有效的抖音URL
+        url = extract_douyin_url(input_text)
         
         if not url:
-            return jsonify({'success': False, 'message': '请输入抖音链接'})
+            return jsonify({'success': False, 'message': '未能提取有效的抖音链接'})
         
         logger.info(f"开始解析链接: {url}")
         
@@ -202,10 +235,16 @@ def download_video():
     
     try:
         data = request.get_json()
-        url = data.get('url', '')
+        input_text = data.get('url', '')
+        
+        if not input_text:
+            return jsonify({'success': False, 'message': '请提供下载链接'})
+        
+        # 提取有效的抖音URL
+        url = extract_douyin_url(input_text)
         
         if not url:
-            return jsonify({'success': False, 'message': '请提供下载链接'})
+            return jsonify({'success': False, 'message': '未能提取有效的抖音链接'})
         
         logger.info(f"开始下载视频: {url}")
         
